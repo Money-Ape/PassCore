@@ -94,14 +94,6 @@ Planned security improvements include:
 * Enhanced record indexing
 * In-memory vault operations
 
-## Installation
-
-```bash
-git clone https://github.com/Money-Ape/PassCore.git
-cd PassCore
-python3 enc.py
-```
-
 ## Requirements
 
 * Python 3.10+
@@ -111,6 +103,14 @@ Install dependencies:
 
 ```bash
 pip install cryptography
+```
+
+## Installation
+
+```bash
+git clone https://github.com/Money-Ape/PassCore.git
+cd PassCore
+python3 enc.py
 ```
 
 ## Roadmap
