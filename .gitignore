@@ -1,3 +1,11 @@
+# local file 
+*.bin
+*.txt
+*.key
+
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
