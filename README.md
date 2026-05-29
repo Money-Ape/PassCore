@@ -1,0 +1,2 @@
+# PassCore
+Cryptographic Password Manager
