@@ -35,7 +35,7 @@ with open("b64b.bin", "rb") as b64b:
 
         dec_records = base64.b64decode(line).decode()
         existing_dec_line.append(dec_records)
-        print(f"{YELLOW}{dec_records}{RESET}")
+        print(f"OLD_RECORD: {YELLOW}{dec_records}{RESET}")
 
 # Store from txt to Compare with
 compare_lines = []
@@ -77,11 +77,12 @@ with open("b64b.bin", "w") as b64b:
 if not os.path.exists("masterkey.key"):
     key = AESGCM.generate_key(bit_length=256) # Encryption AESGCM key
     with open("masterkey.key", "wb") as k: # Stores the masterkey
-        k.write(key)
+        key = k.write(key)
+        print(f"{YELLOW}{key}{RESET}") # Output as YELLOW if new KEY generated
 else:
     with open("masterkey.key", "rb") as k:
         key = k.read()
-        print(f"{BLUE}{key}{RESET}")
+        print(f"{BLUE}{key}{RESET}") # Output as BLUE if KEY exists
 enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
 
 def encrypted_bytes():
@@ -98,7 +99,7 @@ def encrypted_bytes():
 
             encrypt_bin.write(struct.pack(">I", length)) # store encrypted raw bytes length
             encrypt_bin.write(record_enc_d) # store encrypted raw bytes record with nonce
-            print(f"{YELLOW}{length}{RESET}:Encrypted:{GREEN}{record_enc_d}{RESET}")
+            print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
     print("Saved.!\n")
 
@@ -119,7 +120,7 @@ def encrypted_bytes():
                     record_enc_d = decrypt_bin.read(length) # Read full byte record
                     nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
                     decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
-                    print(decrypt_enc_d.decode())
+                    print("DECRYPTED_NEW_BYTE_RECORD: ",decrypt_enc_d.decode())
             
     except FileNotFoundError as e1:
         print(f"{RED}Error: {RESET}", e1)
