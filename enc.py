@@ -1,7 +1,8 @@
 import os, subprocess, base64, struct
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from datetime import datetime
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from PySide6.QtWidgets import(QApplication, QMainWindow, QTextEdit)
+from argon2.low_level import hash_secret_raw, Type
 
 RED = "\033[31m" # ERRORS & REPORT
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
@@ -9,15 +10,26 @@ YELLOW = "\033[33m" # FRESH Keys, INTEGERS & OLD RECORDS
 BLUE = "\033[34m" # EXISTING Keys
 RESET = "\033[0m"
 
-if not os.path.exists("masterkey.key"):
-    key = AESGCM.generate_key(bit_length=256) # Encryption AESGCM key
-    with open("masterkey.key", "wb") as k: # Stores the masterkey
-        k.write(key)
-    print(f"NEW_KEY_GENERATED: {YELLOW}{key}{RESET}") # Output as YELLOW if new KEY generated
+if not os.path.exists("vault.salt"):
+    salt = os.urandom(16)
+    with open("vault.salt", "wb") as k:
+        k.write(salt)
 else:
-    with open("masterkey.key", "rb") as k:
-        key = k.read()
-        print(f"EXISTIGNG_KEY: {BLUE}{key}{RESET}") # Output as BLUE if KEY exists
+    with open("vault.salt", "rb") as k:
+        salt = k.read()
+         
+masterpasswd = input("Enter your masterpasswd: ")
+
+key = hash_secret_raw(
+    secret=masterpasswd.encode(),
+    salt=salt, # Random values
+    time_cost=3, # No. of iterations
+    memory_cost=65536, # 64MB Argon memory hardness
+    parallelism=4, # No. of system threads/lanes
+    hash_len=32, # Output size, in bytes 32bytes = 256bits
+    type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
+)
+print(key.hex())
 
 def encrypt_vault(vault_lines):
 
@@ -35,7 +47,7 @@ def encrypt_vault(vault_lines):
 
             encrypt_bin.write(struct.pack(">I", length)) # store encrypted raw bytes length
             encrypt_bin.write(record_enc_d) # store encrypted raw bytes record with nonce
-            print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
+            # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
     print("Saved.!\n")
 
@@ -77,13 +89,11 @@ def user_edit():
     
     vault_lines = decrypt_vault()
     editor.setPlainText("\n".join(vault_lines))
-    print(vault_lines)
 
     window.show()
     app.exec()
     new_lines = editor.toPlainText().splitlines()
 
     encrypt_vault(new_lines)
-    print("NEW_LINE: ", new_lines)
 
 user_edit()
