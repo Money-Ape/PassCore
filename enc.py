@@ -1,6 +1,7 @@
 import os, subprocess, base64, struct
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.exceptions import InvalidTag
 from PySide6.QtWidgets import(QApplication, QMainWindow, QTextEdit)
 from argon2.low_level import hash_secret_raw, Type
 
@@ -56,7 +57,10 @@ def decrypt_vault():
     vault_lines = []
     file_bin = "passwords.bin"
     try:
-        if os.path.exists(file_bin):
+        if not os.path.exists(file_bin) and salt:
+            print(f"{RED}Vault exists but salt-key or passwords blob is missing.\nThe vault cannot be decrypted.{RESET}")
+
+        else:
             print(f"{GREEN}File in working directory: {RESET}",file_bin.capitalize(), "\n")
 
             with open(file_bin, "rb") as decrypt_bin:
@@ -69,7 +73,11 @@ def decrypt_vault():
                     length = struct.unpack(">I", read_len_data)[0] # Unpack lenght integer bytes
                     record_enc_d = decrypt_bin.read(length) # Read full byte record
                     nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
-                    decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
+                    try:
+                        decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
+
+                    except InvalidTag:
+                        print(f"{RED}Wrong master password or corrupted vault.{RESET}\n")
 
                     vault_lines.append(decrypt_enc_d.decode())
                 
@@ -82,7 +90,7 @@ def user_edit():
     app = QApplication([])
     window = QMainWindow()
     window.setWindowTitle(f"PassCore: {os.getcwd()}")
-    window.setFixedSize(900, 800)
+    window.setFixedSize(900, 700)
     editor = QTextEdit()
 
     window.setCentralWidget(editor)
