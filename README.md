@@ -88,10 +88,8 @@ PassCore is currently an experimental project and should not yet be considered p
 
 Planned security improvements include:
 
-* Master-password-based key derivation
 * Improved vault integrity verification
 * Enhanced record indexing
-* In-memory vault operations
 
 ## Requirements
 
@@ -118,8 +116,8 @@ python3 enc.py
 * [x] Binary vault storage
 * [ ] Timestamp synchronization
 * [x] Record update detection
-* [ ] Master password support
-* [ ] KDF integration (Argon2/scrypt/PBKDF2)
+* [x] Master password support
+* [x] KDF integration (Argon2/scrypt/PBKDF2)
 * [x] Runtime vault workflow
 * [x] Crash-safe cleanup
 * [x] Memory-only vault processing
