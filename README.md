@@ -18,9 +18,9 @@ A cryptographic password manager written in Python, focused on secure vault stor
 ## Current Architecture
 
 ```text
-User Password Data
+Decrypt Password Data
         ↓
-Timestamp Processing
+Editor for User to modify
         ↓
 Encrypted Record Generation
         ↓
@@ -66,21 +66,21 @@ Encrypted Vault
         ↓
 Decrypt on Startup
         ↓
-Temporary Working Data
+Editor for User to modify
         ↓
-Change Detection
+Change Detection with diff
         ↓
    Re-Encrypt
         ↓
-Delete Temporary Data on Shutdown
+Binary chunks local-storage
 ```
 
 Additional work includes:
 
-* Crash recovery
-* Stale temporary file cleanup
+* Crash recovery - *solved*
+* Stale temporary file cleanup - *solved*
 * Reduced plaintext exposure
-* In-memory processing
+* In-memory processing - *solved*
 
 ## Security Notes
 
@@ -90,9 +90,8 @@ Planned security improvements include:
 
 * Master-password-based key derivation
 * Improved vault integrity verification
-* Secure temporary-file handling
 * Enhanced record indexing
-* In-memory vault operations
+* In-memory vault operations [x]
 
 ## Requirements
 
@@ -117,13 +116,13 @@ python3 enc.py
 
 * [x] AES-GCM encrypted records
 * [x] Binary vault storage
-* [x] Timestamp synchronization
+* [ ] Timestamp synchronization
 * [x] Record update detection
 * [ ] Master password support
 * [ ] KDF integration (Argon2/scrypt/PBKDF2)
-* [ ] Runtime vault workflow
-* [ ] Crash-safe cleanup
-* [ ] Memory-only vault processing
+* [x] Runtime vault workflow
+* [x] Crash-safe cleanup
+* [x] Memory-only vault processing
 * [ ] Cross-platform release
 
 ## Disclaimer
