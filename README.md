@@ -91,7 +91,7 @@ Planned security improvements include:
 * Master-password-based key derivation
 * Improved vault integrity verification
 * Enhanced record indexing
-* In-memory vault operations [x]
+* In-memory vault operations
 
 ## Requirements
 
