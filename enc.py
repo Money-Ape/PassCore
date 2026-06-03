@@ -45,7 +45,7 @@ def decrypt_vault(window, key):
     try:
         if not os.path.exists(file_bin):
             print(f"{RED}Vault exists but salt-key or passwords blob is missing.\nThe vault cannot be decrypted.!{RESET}")
-            QMessageBox.information(None, "PassCore:", "No vault found.!\nCreating a new vault.!")
+            QMessageBox.information(None, "PassCore", "No vault found.!\nCreating a new vault.!")
             return []
 
         else:
@@ -60,13 +60,7 @@ def decrypt_vault(window, key):
                     length = struct.unpack(">I", read_len_data)[0] # Unpack lenght integer bytes
                     record_enc_d = decrypt_bin.read(length) # Read full byte record
                     nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
-                    try:
-                        decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
-
-                    except InvalidTag:
-                        QMessageBox.warning(window, "Warning", "wrong master password.!")
-                        return None
-                    
+                    decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
                     vault_lines.append(decrypt_enc_d.decode())
                 
     except FileNotFoundError as e1:
@@ -74,18 +68,80 @@ def decrypt_vault(window, key):
     
     return vault_lines
 
+def vault_lock(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
+    reply = QMessageBox.question(
+        window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
+    )
+    if reply == QMessageBox.Yes:
+        editor.clear()
+        editor.hide()
+        save_btn.hide()
+        close_btn.hide()
+        lock_btn.hide()
+        QMessageBox.information(window, "PassCore", "Vault Locked.!")
+
+        unlock_btn.show()
+        window.key = None 
+        
+    elif reply == QMessageBox.No:
+        return
+
+def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
+    while True:
+        masterpasswd, ok = QInputDialog.getText(
+            window, "Unlock Vault",
+            f"Master Passwd: ", QLineEdit.Password
+        )
+        if not ok:
+            window.close()
+            return
+        
+        key = hash_secret_raw(
+            secret=masterpasswd.encode(),
+            salt=salt, # Random values
+            time_cost=3, # No. of iterations
+            memory_cost=65536, # 64MB Argon memory hardness
+            parallelism=4, # No. of system threads/lanes
+            hash_len=32, # Output size, in bytes 32bytes = 256bits
+            type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
+        )    
+        try:
+            vault_lines = decrypt_vault(window, key)
+            window.key = key
+            unlock_btn.hide()
+            
+            editor.show()
+            save_btn.show()
+            close_btn.show()
+            lock_btn.show()
+            editor.setPlainText("\n".join(vault_lines))
+            return
+        
+        except InvalidTag:
+            QMessageBox.information(window, "PassCore", "wrong master password.!")
+
+
 def save_vault(editor, key):
     new_lines = editor.toPlainText().splitlines()
     encrypt_vault(new_lines, key)
-    QMessageBox.information(None, "PassCore:", "Vault saved successfully.!")
+    QMessageBox.information(None, "PassCore", "Vault saved successfully.!")
 
-def vault_close(window):
+def vault_close(window, editor, key):
     reply = QMessageBox.question(
-        window, "PassCore:", "Close Vault.?", QMessageBox.Yes | QMessageBox.No
+        window, "PassCore", "Save changes before closing the Vault.?", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
     )
     if reply == QMessageBox.Yes:
+        new_lines = editor.toPlainText().splitlines()
+        encrypt_vault(new_lines, key)
         window.close()
         print(f"{YELLOW}bye.!{RESET}")
+    
+    elif reply == QMessageBox.No:
+        window.close()
+        print(f"{YELLOW}bye.!{RESET}")
+    
+    elif reply == QMessageBox.Cancel:
+        return
 
 
 def user_edit():
@@ -94,52 +150,42 @@ def user_edit():
     window.setWindowTitle(f"PassCore: {os.getcwd()}")
     window.setFixedSize(900, 700)
     editor = QTextEdit()
-    save_btn = QPushButton("Save") # save 
-    close_btn = QPushButton("Close") # close
     container = QWidget() # QWidget container
     layout = QVBoxLayout(container) # Vertical layout
     btn_layout = QHBoxLayout() # Horizontal layout
-
-    masterpasswd, ok = QInputDialog.getText(
-        window,
-        "Unlock Vault",
-        f"Master Passwd: ", QLineEdit.Password
-    )
-    if not ok:
-        return
     
-    key = hash_secret_raw(
-        secret=masterpasswd.encode(),
-        salt=salt, # Random values
-        time_cost=3, # No. of iterations
-        memory_cost=65536, # 64MB Argon memory hardness
-        parallelism=4, # No. of system threads/lanes
-        hash_len=32, # Output size, in bytes 32bytes = 256bits
-        type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
-    )
-
-    vault_lines = decrypt_vault(window, key)
-    if vault_lines is None:
-        return
-    editor.setPlainText("\n".join(vault_lines))
+    save_btn = QPushButton("Save") # save 
+    close_btn = QPushButton("Close") # close
+    lock_btn = QPushButton("Lock Vault") # lock vault again
+    unlock_btn = QPushButton("Unlock Vault") # unlock vault again
+    unlock_btn.hide()
 
     btn_layout.addWidget(save_btn)
     btn_layout.addWidget(close_btn)
-
+    btn_layout.addWidget(lock_btn)
+    btn_layout.addWidget(unlock_btn)
 
     layout.addWidget(editor)
     layout.addLayout(btn_layout)
     window.setCentralWidget(container)
     
+    unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
+
     save_btn.clicked.connect(
-        lambda: save_vault(editor, key)
+        lambda: save_vault(editor, window.key)
     )
 
     close_btn.clicked.connect(
-        lambda: vault_close(window))
+        lambda: vault_close(window, editor, window.key))
+    
+    lock_btn.clicked.connect(
+        lambda: vault_lock(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
+    )
+    unlock_btn.clicked.connect(
+        lambda: unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
+    )
     
     window.show()
     app.exec()
-
 
 user_edit()
