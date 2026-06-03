@@ -41,9 +41,9 @@ Encrypted records are stored as:
 
 Replace persistent raw encryption keys with keys derived from a master password using a Key Derivation Function (KDF):
 
-* Argon2
+* Argon2 [argon2id]
 * scrypt
-* PBKDF2
+* AESGCM
 
 Planned flow:
 
@@ -95,11 +95,12 @@ Planned security improvements include:
 
 * Python 3.10+
 * cryptography
+* python-argon2
 
 Install dependencies:
 
 ```bash
-pip install cryptography
+./run.sh # to install all dependencies
 ```
 
 ## Installation
@@ -107,7 +108,8 @@ pip install cryptography
 ```bash
 git clone https://github.com/Money-Ape/PassCore.git
 cd PassCore
-python3 enc.py
+chmod +x run.sh
+./run.sh
 ```
 
 ## Roadmap
