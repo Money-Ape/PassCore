@@ -1,8 +1,7 @@
-import os, subprocess, base64, struct
-from datetime import datetime
+import os, struct
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
-from PySide6.QtWidgets import(QApplication, QMainWindow, QTextEdit)
+from PySide6.QtWidgets import(QWidget ,QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QTextEdit, QInputDialog, QLineEdit, QPushButton, QMessageBox)
 from argon2.low_level import hash_secret_raw, Type
 
 RED = "\033[31m" # ERRORS & REPORT
@@ -18,26 +17,14 @@ if not os.path.exists("vault.salt"):
 else:
     with open("vault.salt", "rb") as k:
         salt = k.read()
-         
-masterpasswd = input("Enter your masterpasswd: ")
 
-key = hash_secret_raw(
-    secret=masterpasswd.encode(),
-    salt=salt, # Random values
-    time_cost=3, # No. of iterations
-    memory_cost=65536, # 64MB Argon memory hardness
-    parallelism=4, # No. of system threads/lanes
-    hash_len=32, # Output size, in bytes 32bytes = 256bits
-    type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
-)
-
-def encrypt_vault(vault_lines):
+def encrypt_vault(new_lines, key):
 
     # Encrypt raw bytes
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
 
     with open("passwords.bin", "wb") as encrypt_bin:
-        for i, line in enumerate(vault_lines):
+        for i, line in enumerate(new_lines):
             line = line.strip()
 
             nonce = os.urandom(12)
@@ -51,13 +38,15 @@ def encrypt_vault(vault_lines):
 
     print("Saved.!\n")
 
-def decrypt_vault():
+def decrypt_vault(window, key):
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
     vault_lines = []
     file_bin = "passwords.bin"
     try:
-        if not os.path.exists(file_bin) and salt:
-            print(f"{RED}Vault exists but salt-key or passwords blob is missing.\nThe vault cannot be decrypted.{RESET}")
+        if not os.path.exists(file_bin):
+            print(f"{RED}Vault exists but salt-key or passwords blob is missing.\nThe vault cannot be decrypted.!{RESET}")
+            QMessageBox.information(None, "PassCore:", "No vault found.!\nCreating a new vault.!")
+            return []
 
         else:
             print(f"{GREEN}File in working directory: {RESET}",file_bin.capitalize(), "\n")
@@ -66,7 +55,6 @@ def decrypt_vault():
                 while True:
                     read_len_data = decrypt_bin.read(4) # Read 4 byte length
                     if not read_len_data:
-                        print(f"{RED}End Of Line, EOF.!{RESET}")
                         break
 
                     length = struct.unpack(">I", read_len_data)[0] # Unpack lenght integer bytes
@@ -76,8 +64,9 @@ def decrypt_vault():
                         decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
 
                     except InvalidTag:
-                        print(f"{RED}Wrong master password or corrupted vault.{RESET}\n")
-
+                        QMessageBox.warning(window, "Warning", "wrong master password.!")
+                        return None
+                    
                     vault_lines.append(decrypt_enc_d.decode())
                 
     except FileNotFoundError as e1:
@@ -85,22 +74,72 @@ def decrypt_vault():
     
     return vault_lines
 
+def save_vault(editor, key):
+    new_lines = editor.toPlainText().splitlines()
+    encrypt_vault(new_lines, key)
+    QMessageBox.information(None, "PassCore:", "Vault saved successfully.!")
+
+def vault_close(window):
+    reply = QMessageBox.question(
+        window, "PassCore:", "Close Vault.?", QMessageBox.Yes | QMessageBox.No
+    )
+    if reply == QMessageBox.Yes:
+        window.close()
+        print(f"{YELLOW}bye.!{RESET}")
+
+
 def user_edit():
     app = QApplication([])
     window = QMainWindow()
     window.setWindowTitle(f"PassCore: {os.getcwd()}")
     window.setFixedSize(900, 700)
     editor = QTextEdit()
+    save_btn = QPushButton("Save") # save 
+    close_btn = QPushButton("Close") # close
+    container = QWidget() # QWidget container
+    layout = QVBoxLayout(container) # Vertical layout
+    btn_layout = QHBoxLayout() # Horizontal layout
 
-    window.setCentralWidget(editor)
+    masterpasswd, ok = QInputDialog.getText(
+        window,
+        "Unlock Vault",
+        f"Master Passwd: ", QLineEdit.Password
+    )
+    if not ok:
+        return
     
-    vault_lines = decrypt_vault()
+    key = hash_secret_raw(
+        secret=masterpasswd.encode(),
+        salt=salt, # Random values
+        time_cost=3, # No. of iterations
+        memory_cost=65536, # 64MB Argon memory hardness
+        parallelism=4, # No. of system threads/lanes
+        hash_len=32, # Output size, in bytes 32bytes = 256bits
+        type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
+    )
+
+    vault_lines = decrypt_vault(window, key)
+    if vault_lines is None:
+        return
     editor.setPlainText("\n".join(vault_lines))
 
+    btn_layout.addWidget(save_btn)
+    btn_layout.addWidget(close_btn)
+
+
+    layout.addWidget(editor)
+    layout.addLayout(btn_layout)
+    window.setCentralWidget(container)
+    
+    save_btn.clicked.connect(
+        lambda: save_vault(editor, key)
+    )
+
+    close_btn.clicked.connect(
+        lambda: vault_close(window))
+    
     window.show()
     app.exec()
-    new_lines = editor.toPlainText().splitlines()
 
-    encrypt_vault(new_lines)
 
 user_edit()
