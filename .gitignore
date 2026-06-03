@@ -2,7 +2,7 @@
 *.bin
 *.txt
 *.key
-
+*.salt
 
 # Vscode
 .vscode

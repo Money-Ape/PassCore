@@ -30,7 +30,6 @@ key = hash_secret_raw(
     hash_len=32, # Output size, in bytes 32bytes = 256bits
     type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
 )
-print(key.hex())
 
 def encrypt_vault(vault_lines):
 
