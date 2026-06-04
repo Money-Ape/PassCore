@@ -1,30 +1,58 @@
 # PassCore
 
-A cryptographic password manager written in Python, focused on secure vault storage, encrypted record management, and timestamp-based change tracking.
+A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
 
-> **Project Status:** Active Development
+> **Project Status:** Active Development (v1.1-core)
 
 ## Features
 
-* AES-GCM encryption for password records
-* Per-record random nonce generation
+* AES-GCM authenticated encryption
+* Argon2id-based key derivation
+* Master password protected vault
+* Random salt generation and persistence
 * Binary vault storage
-* Timestamp tracking for password entries
-* Detection of modified records
-* Import and synchronization from plaintext sources
 * Length-prefixed encrypted record format
-* Python-based implementation with minimal dependencies
+* Vault lock/unlock workflow
+* Save-before-exit protection
+* First-run vault initialization
+* Vault metadata management
+* Blob-based encrypted storage architecture
+* PySide6 graphical user interface
 
 ## Current Architecture
 
 ```text
-Decrypt Password Data
+Master Password
         ↓
-Editor for User to modify
+     Argon2id
         ↓
-Encrypted Record Generation
+  Vault Encryption Key
         ↓
-Binary Vault Storage
+     AES-GCM
+        ↓
+   passwords.bin
+        ↓
+   Blob Splitting
+        ↓
+vault/blob_0000.bin
+vault/blob_0001.bin
+vault/blob_0002.bin
+        ↓
+Persistent Storage
+```
+
+Vault unlock flow:
+
+```text
+Encrypted Blobs
+        ↓
+ Blob Reconstruction
+        ↓
+   passwords.bin
+        ↓
+ AES-GCM Decryption
+        ↓
+ Vault Editor
 ```
 
 Encrypted records are stored as:
@@ -35,72 +63,99 @@ Encrypted records are stored as:
 [ciphertext + authentication tag]
 ```
 
-## Planned Features
+## Security Design
 
-### Vault Key Derivation
+### Key Derivation
 
-Replace persistent raw encryption keys with keys derived from a master password using a Key Derivation Function (KDF):
-
-* Argon2 [argon2id]
-* scrypt
-* AESGCM
-
-Planned flow:
+PassCore derives vault encryption keys from a master password using Argon2id.
 
 ```text
 Master Password
         ↓
-       KDF
+      Salt
         ↓
-Vault Encryption Key
+    Argon2id
         ↓
-AES-GCM Encryption
+256-bit Vault Key
+        ↓
+    AES-GCM
 ```
 
-### Runtime Working Vault
+### Blob Architecture
 
-Future versions are planned to use a temporary runtime working file:
+Encrypted vault data is split into multiple binary blobs after encryption.
 
 ```text
 Encrypted Vault
         ↓
-Decrypt on Startup
+    Split
         ↓
-Editor for User to modify
-        ↓
-Change Detection with diff
-        ↓
-   Re-Encrypt
-        ↓
-Binary chunks local-storage
+Blob Storage
 ```
 
-Additional work includes:
+During unlock:
 
-* Crash recovery - *solved*
-* Stale temporary file cleanup - *solved*
-* Reduced plaintext exposure
-* In-memory processing - *solved*
+```text
+Blob Storage
+        ↓
+   Rebuild
+        ↓
+Encrypted Vault
+        ↓
+   Decrypt
+```
 
-## Security Notes
+The blob architecture is intended to reduce direct exposure of vault storage and provide a foundation for future distributed storage strategies.
 
-PassCore is currently an experimental project and should not yet be considered production-ready.
+## Current Capabilities
 
-Planned security improvements include:
+* Vault creation
+* Vault initialization metadata
+* Master password authentication
+* Vault locking and unlocking
+* Save vault contents
+* Save-before-close workflow
+* Blob generation
+* Blob reconstruction
+* Corruption detection
+* Wrong-password detection
 
-* Improved vault integrity verification
-* Enhanced record indexing
+## Planned Features
+
+### Storage
+
+* Distributed blob locations
+* Hidden vault storage paths
+* Automatic vault backups
+* Vault export/import
+
+### Security
+
+* Blob integrity verification
+* Secure deletion of temporary files
+* Optional memory-only reconstruction
+* Vault health diagnostics
+
+### User Experience
+
+* Search records
+* Record categories
+* Password generator
+* Auto-lock timer
+* Cross-platform packaging
 
 ## Requirements
 
 * Python 3.10+
 * cryptography
-* python-argon2
+* argon2-cffi
+* PySide6
 
 Install dependencies:
 
 ```bash
-./run.sh # to install all dependencies
+chmod +x run.sh
+./run.sh # dependencies will automatically installed by the script.!
 ```
 
 ## Installation
@@ -108,23 +163,28 @@ Install dependencies:
 ```bash
 git clone https://github.com/Money-Ape/PassCore.git
 cd PassCore
+
 chmod +x run.sh
 ./run.sh
 ```
 
 ## Roadmap
 
-* [x] AES-GCM encrypted records
-* [x] Binary vault storage
-* [ ] Timestamp synchronization
-* [x] Record update detection
+* [x] AES-GCM encryption
+* [x] Argon2id key derivation
 * [x] Master password support
-* [x] KDF integration (Argon2/scrypt/PBKDF2)
-* [x] Runtime vault workflow
-* [x] Crash-safe cleanup
-* [x] Memory-only vault processing
+* [x] Binary vault format
+* [x] Vault lock/unlock workflow
+* [x] First-run initialization
+* [x] Blob storage architecture
+* [x] Blob reconstruction
+* [x] Save-before-exit protection
+* [ ] Blob integrity verification
+* [ ] Distributed blob storage
+* [ ] Backup and recovery
+* [ ] Password generator
 * [ ] Cross-platform release
 
 ## Disclaimer
 
-PassCore is an educational and experimental project. Review the source code carefully before using it to store sensitive information.
+PassCore is an educational and experimental project. It has not undergone professional security review and should not yet be considered production-ready for storing highly sensitive information.
