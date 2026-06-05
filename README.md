@@ -179,8 +179,8 @@ chmod +x run.sh
 * [x] Blob storage architecture
 * [x] Blob reconstruction
 * [x] Save-before-exit protection
-* [ ] Blob integrity verification
-* [ ] Distributed blob storage
+* [x] Blob integrity verification
+* [x] Distributed blob storage
 * [ ] Backup and recovery
 * [ ] Password generator
 * [ ] Cross-platform release

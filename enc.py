@@ -1,4 +1,4 @@
-import os, struct
+import os, struct, json
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
@@ -49,8 +49,8 @@ def split_file_bin(file_bin, chunk_size=64):
             if not chunk:
                 break
 
-            path = os.path.abspath(f"vault/blob_{index:04d}.bin")
-            print(f"{YELLOW}WRITING: blob_{index:04d}.bin {len(chunk)} bytes{RESET}")
+            path = os.path.abspath(f"vault/blob_{index:04d}.bin")            
+            print(f"{path} Chunk Size: {len(chunk)} bytes")
             with open(path, "wb") as blob_dst: # write data for splitting bin data to blobs 
                 blob_dst.write(chunk)
             index += 1
@@ -75,7 +75,33 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
         if os.path.isfile(file_bin) and file_bin == "passwords.bin":
             print(os.path.getsize(file_bin))
             split_file_bin(file_bin, chunk_size=64)
+    
+    if os.path.exists("vault/meta.json"):
+        with open("vault/meta.json", "r") as meta_js:
+            vault_meta = json.load(meta_js)
+    else:
+        vault_meta = {}
 
+    timestamp = datetime.now().strftime("%d-%m-%Y %H:%M")
+    blob_data = {}
+    total_size = 0
+    for file_bin in os.listdir("vault"):
+        if file_bin.startswith("blob_") and file_bin.endswith("bin"):
+            size = os.path.getsize(os.path.join("vault", file_bin))
+            blob_data[file_bin] = size
+            total_size += size
+
+    print(f"Total file size: {total_size} bytes")
+
+    vault_meta = {
+        "created_at": timestamp,
+        "total_size": total_size,
+        "blob_count": len(blob_data),
+        "blobs": blob_data
+    }
+    with open("vault/meta.json", "w") as json_update:
+        json.dump(vault_meta, json_update, indent=4)
+    
     print("Saved.!\n")
 
 def decrypt_vault(key):
@@ -127,13 +153,23 @@ def vault_lock(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         return
 
 def is_first_run():
-    return not os.path.exists("vault/vault.meta")
+    return not os.path.exists("vault/meta.json")
 
-def init_vault(window):
+def init_vault():
     os.makedirs("vault", exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open("vault/vault.meta", "w") as meta_f:
-        meta_f.write(f"initialized\nCreated at {timestamp}") 
+    vault_meta = {}
+    blob_data = {}
+    total_size = 0
+    vault_meta = {
+        "created_at": timestamp,
+        "total_size": total_size,
+        "blob_count": len(blob_data),
+        "blobs": blob_data
+        }
+    
+    with open("vault/meta.json", "w") as meta_f:
+        json.dump(vault_meta, meta_f, indent=4)
 
 def vault_exists():
     if not os.path.isdir("vault"):
@@ -143,7 +179,7 @@ def vault_exists():
         f for f in os.listdir("vault")
         if f.startswith("blob_") and f.endswith(".bin")
     ]
-    if not os.path.exists("vault/vault.meta"):
+    if not os.path.exists("vault/meta.json"):
         is_first_run()
         
     return len(blobs) > 0
@@ -151,10 +187,10 @@ def vault_exists():
 def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
     while True:
         if is_first_run():
-            init_vault(window)
+            init_vault()
             masterpasswd, ok = QInputDialog.getText(
                 window, "Unlock Vault",
-                f"Master Passwd: ", QLineEdit.Password
+                f"Set your master password: ", QLineEdit.Password
             )
             if not ok:
                 window.close()
