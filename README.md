@@ -235,5 +235,3 @@ It has not undergone a professional security audit and should not yet be conside
 
 While PassCore implements modern cryptographic primitives such as Argon2id and AES-GCM, users should review the source code carefully before relying on it for critical data protection.
 
-```
-```
