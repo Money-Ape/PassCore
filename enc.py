@@ -1,8 +1,10 @@
-import os, struct, json
+import os, struct, json, platform
+from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
 from PySide6.QtWidgets import(QWidget ,QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QTextEdit, QInputDialog, QLineEdit, QPushButton, QMessageBox)
+from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
 
 RED = "\033[31m" # ERRORS & REPORT
@@ -11,37 +13,67 @@ YELLOW = "\033[33m" # FRESH Keys, INTEGERS & OLD RECORDS
 BLUE = "\033[34m" # EXISTING Keys
 RESET = "\033[0m"
 
-if not os.path.exists("vault.salt"):
+def get_PassCore_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path.home() / ".local" / "share" / "passcore"
+    
+    elif sys == "Windows":
+        return Path(os.getenv("APPDATA")) / "PassCore"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
+        
+def get_cache_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path.home() / ".cache" / "passcore"
+    
+    elif sys == "Windows":
+        return Path(os.getenv("LOCALAPPDATA")) / "PassCore" / "Cache"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
+    
+PASSCORE_DIR = get_PassCore_dir()
+CACHE_DIR = get_cache_dir()
+PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+SALT_FILE = PASSCORE_DIR / "vault.salt"
+META_FILE = PASSCORE_DIR / "meta.json"
+WORKING_BIN = CACHE_DIR / "passwords.bin"
+
+if not SALT_FILE.exists():
     salt = os.urandom(16)
-    with open("vault.salt", "wb") as k:
+    with open(SALT_FILE, "wb") as k:
         k.write(salt)
 else:
-    with open("vault.salt", "rb") as k:
+    with open(SALT_FILE, "rb") as k:
         salt = k.read()
 
 def merge_blob_bin():
     blobs = [
-        f for f in os.listdir("vault")
-        if f.startswith("blob_") and f.endswith(".bin")
+        f.name
+        for f in PASSCORE_DIR.iterdir()
+        if f.name.startswith("blob_") and f.suffix == ".bin"
     ]
     if not blobs:
         raise FileNotFoundError("blobs not found.!")
     
-    with open("passwords.bin", "wb") as dst_bin:
-        for blobs in sorted(os.listdir("vault")):
-            if blobs.startswith("blob_") and blobs.endswith(".bin"):
+    with open(WORKING_BIN, "wb") as dst_bin:
+        for blobs in sorted(PASSCORE_DIR.iterdir()):
+            if blobs.match("blob_*.bin"):
 
-                with open(os.path.join("vault", blobs), "rb") as src_blob:
+                with open(PASSCORE_DIR / blobs, "rb") as src_blob:
                     dst_bin.write(src_blob.read())
 
 def split_file_bin(file_bin, chunk_size=64):
-    for exist_blob in os.listdir("vault"):
-        if exist_blob.startswith("blob_") and exist_blob.endswith(".bin"):
-            print(f"{BLUE}DELETING_existing {exist_blob}{RESET}")
-            os.remove(os.path.join("vault", exist_blob)) # Remove existing blobs to prevent corrupt reconstruction while merging files for decrypt.!
+    for exist_blob in PASSCORE_DIR.iterdir():
+        if exist_blob.name.startswith("blob_") and exist_blob.suffix == ".bin":
+            print(f"{BLUE}DELETING_existing {exist_blob.name}{RESET}")
+            os.remove(PASSCORE_DIR / exist_blob) # Remove existing blobs to prevent corrupt reconstruction while merging files for decrypt.!
 
-    print(f"\n{GREEN}splitting {file_bin}......{RESET}")
-    with open("passwords.bin", "rb") as src_bin:
+    print(f"\n{GREEN}splitting {file_bin.name}......{RESET}")
+    with open(WORKING_BIN, "rb") as src_bin:
         index = 0
 
         while True:
@@ -49,8 +81,8 @@ def split_file_bin(file_bin, chunk_size=64):
             if not chunk:
                 break
 
-            path = os.path.abspath(f"vault/blob_{index:04d}.bin")            
-            print(f"{path} Chunk Size: {len(chunk)} bytes")
+            path = (PASSCORE_DIR / f"blob_{index:04d}.bin").resolve()
+            print(f"{path.name} Chunk Size: {len(chunk)} bytes")
             with open(path, "wb") as blob_dst: # write data for splitting bin data to blobs 
                 blob_dst.write(chunk)
             index += 1
@@ -58,7 +90,7 @@ def split_file_bin(file_bin, chunk_size=64):
 def encrypt_vault(new_lines, key): # Encrypt raw bytes
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
 
-    with open("passwords.bin", "wb") as encrypt_bin:
+    with open(WORKING_BIN, "wb") as encrypt_bin:
         for i, line in enumerate(new_lines):
             line = line.strip()
 
@@ -71,13 +103,11 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
             encrypt_bin.write(record_enc_d) # store encrypted raw bytes record with nonce
             # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
-    for file_bin in os.listdir():
-        if os.path.isfile(file_bin) and file_bin == "passwords.bin":
-            print(os.path.getsize(file_bin))
-            split_file_bin(file_bin, chunk_size=64)
+    if WORKING_BIN.exists():
+        split_file_bin(WORKING_BIN, chunk_size=64)
     
-    if os.path.exists("vault/meta.json"):
-        with open("vault/meta.json", "r") as meta_js:
+    if META_FILE.exists():
+        with open(META_FILE, "r") as meta_js:
             vault_meta = json.load(meta_js)
     else:
         vault_meta = {}
@@ -85,13 +115,15 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
     timestamp = datetime.now().strftime("%d-%m-%Y %H:%M")
     blob_data = {}
     total_size = 0
-    for file_bin in os.listdir("vault"):
-        if file_bin.startswith("blob_") and file_bin.endswith("bin"):
-            size = os.path.getsize(os.path.join("vault", file_bin))
-            blob_data[file_bin] = size
+    for file_bin in PASSCORE_DIR.iterdir():
+        if file_bin.match("blob_*.bin"):
+            size = file_bin.stat().st_size
+            blob_data[file_bin.name] = size
             total_size += size
-
-    print(f"Total file size: {total_size} bytes")
+    print("================================================")
+    print(f"Working bin: {WORKING_BIN.stat().st_size} bytes")
+    print(f"Total blob size: {total_size} bytes")
+    print("================================================")
 
     vault_meta = {
         "created_at": timestamp,
@@ -99,23 +131,26 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
         "blob_count": len(blob_data),
         "blobs": blob_data
     }
-    with open("vault/meta.json", "w") as json_update:
+    with open(META_FILE, "w") as json_update:
         json.dump(vault_meta, json_update, indent=4)
     
     print("Saved.!\n")
+    
+    print(f"removed : {WORKING_BIN}...")
+    os.remove(WORKING_BIN)
 
 def decrypt_vault(key):
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
     vault_lines = []
-    file_bin = "passwords.bin"
+    file_bin = WORKING_BIN
     try:
-        if not os.path.exists(file_bin):
+        if not WORKING_BIN.exists():
             print(f"{RED}Vault exists but salt-key or passwords blob is missing.\nThe vault cannot be decrypted.!{RESET}")
             QMessageBox.information(None, "PassCore", "No vault found.!\nCreating a new vault.!")
             return []
 
         else:
-            print(f"{GREEN}File in working directory: {RESET}",file_bin.capitalize(), "\n")
+            print(f"{GREEN}File in working directory: {RESET}",file_bin.name.capitalize(), "\n")
 
             with open(file_bin, "rb") as decrypt_bin:
                 while True:
@@ -153,10 +188,10 @@ def vault_lock(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         return
 
 def is_first_run():
-    return not os.path.exists("vault/meta.json")
+    return not META_FILE.exists()
 
 def init_vault():
-    os.makedirs("vault", exist_ok=True)
+    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     vault_meta = {}
     blob_data = {}
@@ -168,18 +203,19 @@ def init_vault():
         "blobs": blob_data
         }
     
-    with open("vault/meta.json", "w") as meta_f:
+    with open(META_FILE, "w") as meta_f:
         json.dump(vault_meta, meta_f, indent=4)
 
 def vault_exists():
-    if not os.path.isdir("vault"):
+    if not PASSCORE_DIR.is_dir():
         return False
     
     blobs = [
-        f for f in os.listdir("vault")
-        if f.startswith("blob_") and f.endswith(".bin")
+        f.name
+        for f in PASSCORE_DIR.iterdir()
+        if f.name.startswith("blob_") and f.suffix == ".bin"
     ]
-    if not os.path.exists("vault/meta.json"):
+    if not META_FILE.exists():
         is_first_run()
         
     return len(blobs) > 0
@@ -267,6 +303,12 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         except InvalidTag:
             QMessageBox.information(window, "PassCore", "wrong master password.!")
 
+def autosave_vault(window, editor):
+    if window.key is None:
+        return
+    
+    save_vault(editor, window.key)
+
 def save_vault(editor, key):
     new_lines = editor.toPlainText().splitlines()
     encrypt_vault(new_lines, key)
@@ -315,6 +357,15 @@ def user_edit():
     layout.addWidget(editor)
     layout.addLayout(btn_layout)
     window.setCentralWidget(container)
+
+    autosave_timer = QTimer() # Autosave Timer 
+    autosave_timer.setSingleShot(True) # Trigger autosave timer : True
+    editor.textChanged.connect(
+        lambda: autosave_timer.start(30000) # Set autosave timer for 30s if changes appear in Editor.
+    )
+    autosave_timer.timeout.connect(
+        lambda: autosave_vault(window, editor) # triggers autosave_vault() when key is None
+    )
     
     unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
     

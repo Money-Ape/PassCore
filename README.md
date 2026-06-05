@@ -30,13 +30,19 @@ Master Password
         ↓
      AES-GCM
         ↓
-   passwords.bin
+Temporary Working Vault
+(passwords.bin)
         ↓
    Blob Splitting
         ↓
-vault/blob_0000.bin
-vault/blob_0001.bin
-vault/blob_0002.bin
+
+~/.local/share/passcore/
+├── vault.salt
+├── meta.json
+├── blob_0000.bin
+├── blob_0001.bin
+└── ...
+
         ↓
 Persistent Storage
 ```
@@ -46,22 +52,17 @@ Vault unlock flow:
 ```text
 Encrypted Blobs
         ↓
- Blob Reconstruction
+Blob Reconstruction
         ↓
-   passwords.bin
+Temporary Working Vault
+(passwords.bin)
         ↓
  AES-GCM Decryption
         ↓
  Vault Editor
 ```
 
-Encrypted records are stored as:
-
-```text
-[4-byte length]
-[12-byte nonce]
-[ciphertext + authentication tag]
-```
+After encryption and blob generation, the temporary working vault is automatically removed from cache storage.
 
 ## Security Design
 
@@ -70,7 +71,7 @@ Encrypted records are stored as:
 PassCore derives vault encryption keys from a master password using Argon2id.
 
 ```text
-Master Password
+ Master Password
         ↓
       Salt
         ↓
@@ -78,31 +79,49 @@ Master Password
         ↓
 256-bit Vault Key
         ↓
-    AES-GCM
+     AES-GCM
 ```
+
+### Storage Layout
+
+Linux systems use XDG-compliant storage locations:
+
+```text
+~/.local/share/passcore/
+├── vault.salt
+├── meta.json
+├── blob_0000.bin
+├── blob_0001.bin
+└── ...
+
+~/.cache/passcore/
+└── passwords.bin (temporary)
+```
+
+The temporary working vault is reconstructed only when needed and is automatically removed after encryption and blob generation.
 
 ### Blob Architecture
 
 Encrypted vault data is split into multiple binary blobs after encryption.
 
 ```text
-Encrypted Vault
+  Encrypted Vault
         ↓
-    Split
+      Split
         ↓
-Blob Storage
+   Blob Storage
 ```
 
 During unlock:
 
 ```text
-Blob Storage
+   Blob Storage
         ↓
-   Rebuild
+     Rebuild
         ↓
-Encrypted Vault
+  Encrypted Vault
         ↓
-   Decrypt
+     Decrypt
 ```
 
 The blob architecture is intended to reduce direct exposure of vault storage and provide a foundation for future distributed storage strategies.
@@ -112,27 +131,32 @@ The blob architecture is intended to reduce direct exposure of vault storage and
 * Vault creation
 * Vault initialization metadata
 * Master password authentication
+* Argon2id key derivation
+* AES-GCM authenticated encryption
 * Vault locking and unlocking
 * Save vault contents
 * Save-before-close workflow
+* Automatic vault autosave
 * Blob generation
 * Blob reconstruction
-* Corruption detection
+* Temporary vault cleanup
 * Wrong-password detection
+* Corruption detection
+* XDG-compliant storage layout
+* Cross-platform path abstraction
 
 ## Planned Features
 
 ### Storage
 
 * Distributed blob locations
-* Hidden vault storage paths
 * Automatic vault backups
 * Vault export/import
 
 ### Security
 
 * Blob integrity verification
-* Secure deletion of temporary files
+* Secure overwrite before file deletion
 * Optional memory-only reconstruction
 * Vault health diagnostics
 
@@ -143,30 +167,6 @@ The blob architecture is intended to reduce direct exposure of vault storage and
 * Password generator
 * Auto-lock timer
 * Cross-platform packaging
-
-## Requirements
-
-* Python 3.10+
-* cryptography
-* argon2-cffi
-* PySide6
-
-Install dependencies:
-
-```bash
-chmod +x run.sh
-./run.sh # dependencies will automatically installed by the script.!
-```
-
-## Installation
-
-```bash
-git clone https://github.com/Money-Ape/PassCore.git
-cd PassCore
-
-chmod +x run.sh
-./run.sh
-```
 
 ## Roadmap
 
@@ -179,12 +179,61 @@ chmod +x run.sh
 * [x] Blob storage architecture
 * [x] Blob reconstruction
 * [x] Save-before-exit protection
-* [x] Blob integrity verification
-* [x] Distributed blob storage
+* [x] Autosave workflow
+* [x] XDG storage layout
+* [x] Temporary vault cleanup
+* [ ] Blob integrity verification
+* [ ] Distributed blob storage
 * [ ] Backup and recovery
 * [ ] Password generator
+* [ ] Auto-lock timer
 * [ ] Cross-platform release
+
+
+## Requirements
+
+* Python 3.10+
+* cryptography
+* argon2-cffi
+* PySide6
+
+---
+
+## Installation
+
+```bash
+git clone https://github.com/Money-Ape/PassCore.git
+cd PassCore
+
+chmod +x run.sh
+./run.sh # running bash will auto install the required dependencies 
+```
+
+---
+
+## Project Structure
+
+```text
+~/.local/share/passcore/
+├── vault.salt
+├── meta.json
+├── blob_0000.bin
+├── blob_0001.bin
+└── ...
+
+~/.cache/passcore/
+└── passwords.bin (temporary)
+```
+
+---
 
 ## Disclaimer
 
-PassCore is an educational and experimental project. It has not undergone professional security review and should not yet be considered production-ready for storing highly sensitive information.
+PassCore is an educational and experimental project.
+
+It has not undergone a professional security audit and should not yet be considered production-ready for storing highly sensitive information.
+
+While PassCore implements modern cryptographic primitives such as Argon2id and AES-GCM, users should review the source code carefully before relying on it for critical data protection.
+
+```
+```

@@ -1,9 +1,3 @@
-# local file 
-vault/
-*.bin
-*.txt
-*.key
-*.salt
 
 # Vscode
 .vscode
