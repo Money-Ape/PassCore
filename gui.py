@@ -1,6 +1,5 @@
 import sys
 from datetime import datetime
-
 from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame)
 
 class PassCoreUI(QMainWindow):
@@ -10,6 +9,31 @@ class PassCoreUI(QMainWindow):
         self.setWindowTitle("PassCore vault")
         self.resize(1100, 700)
         self.build_ui()
+        self.lock_screen = (
+            "mww mww hwm wwl mwwMmwwww wwwmmmwww mwww wwl w wlwwww\n"
+            "wwwww nwwwwwww n lwwwww w wwwww mwww nwwwwwww Nw mww w lwwww nwwwww\n"
+            "wwww wwwwww w wwwwwwww wwwwww wwww w w w wwwwww\n"
+            "lwwww wwwwww w wwwwww wwwwwwwwwww wwwwww Mwww wwwwww\n"
+            "lwwww wwwwwwwwwwwwww Mwwwwwwwwwwwwwwww Mwww wwwwww\n\n"
+            "wwwl wwww Mwww lwwww w wwwwwwwwwwwwww w wwwwwwww mwww wwww lwwwww\n"
+            "lwwwww w lwwwww wwww wwwwwwwwwwwwwwwww wwww wwwwwwwwww wwwwww Wwww\n"
+            "wwwwwwwwwww wwww w wwwww wwww wwwwwwwwwwwwww Mwwwwww wwwww w www lwwwwwwww\n"
+            "wwww wwww lwwww www lwwwwwwwwwwwwwwww wwwwwww wwwww wwwwwwww N w\n"
+            "wwwwww wwwwwwwwww\n\n"
+            "w wwwwww w w wwwww wwwwwwww Mwww Mwww lwwww wwww w wwwwwwwwwwwwww\n"
+            "w wwwwwwwwww Mwww wwww lwwwwwwww w wwwwwwww wwww wwwwwwwwwwww\n"
+            "Mwwwwwwwwwwww Mwww w wwwww wwww wwwwwwwwwwwwwwww Mwwwwww wwwww w www\n"
+            "wwwwwwwwww wwwwww www w www wwwwww wwwww Mwwww wwwww\n"
+            "wwwwwwwwwwwww wwwwwwwwwwwwww Mwwww www.\n\n"
+            "w lwwwww wwwwwww w wwwwwwww w wwwwwww wwww wwwwwwww w wwww w\n"
+            "Mwww wwwwwww wwww w wwwwwwwwww wwwwwwwww wwww wwwwwwww wwww M w w\n"
+            "Mwwww wwwwwwwwww wwww w wwwwwwwww wwwwwwwwwwwwwwww w wwwwwwwwwww Mwww\n"
+            "wwww wwwwww w wwwwwwww wwwwwwwwwwww w wwwwwwwwwww wwwwww\n"
+            "wwwwwwwwwwwwwwwww wwwwwwwwwwwwwwwww wwwwww www\n"
+        )
+
+        self.vault_text = None
+        self.editor.setPlainText(self.lock_screen)
 
     def build_ui(self):
 
@@ -17,6 +41,15 @@ class PassCoreUI(QMainWindow):
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #FFF8FA;
+                color: #202020;
+            }
+
+            QMenuBar {
+                color: #202020;
+            }
+
+            QMenu {
+                color: #202020;
             }
         """)
 
@@ -44,11 +77,14 @@ class PassCoreUI(QMainWindow):
         self.editor.setStyleSheet("""
             QTextEdit {
                 background: #FFFFFF;
+                color: #202020;
                 border: 2px solid #D8B8C4;
                 border-radius: 8px;
                 padding: 8px;
                 font-family: "JetBrains Mono";
                 font-size: 12pt;
+                selection-background-color: #D8B8C4;
+                selection-color: #202020;
             }
         """)
 
@@ -66,7 +102,6 @@ class PassCoreUI(QMainWindow):
                 border-radius: 8px;
             }
         """)
-
         sidebar_layout = QVBoxLayout(sidebar)
 
         # Common Label Style
@@ -220,33 +255,29 @@ class PassCoreUI(QMainWindow):
     # ==================================================
     # Actions
     def vault_lock(self):
-        self.editor.setReadOnly(True)
-        self.save_btn.setEnabled(False)
+        if not self.editor.isReadOnly():
+            self.vault_text = self.editor.toPlainText()
 
+        self.editor.setPlainText(self.lock_screen)
+        self.editor.setReadOnly(True)
         self.status_label.setText("Locked")
         self.status_label.setStyleSheet("""
-            QLabel {
-                border: none;
-                background: transparent;
-                color: #C0392B;
-                font-size: 15pt;
-                font-weight: bold;
-            }
+            border: none;
+            color: red;
+            font-size: 12pt;
+            font-weight: bold;
         """)
 
     def unlock_vault(self):
+        self.editor.setPlainText(self.vault_text)
         self.editor.setReadOnly(False)
-        self.save_btn.setEnabled(True)
 
         self.status_label.setText("Unlocked")
         self.status_label.setStyleSheet("""
-            QLabel {
-                border: none;
-                background: transparent;
-                color: #27AE60;
-                font-size: 15pt;
-                font-weight: bold;
-            }
+            border: none;
+            color: green;
+            font-size: 12pt;
+            font-weight: bold;
         """)
 
     def save_vault(self):
