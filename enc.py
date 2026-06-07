@@ -50,6 +50,29 @@ else:
     with open(SALT_FILE, "rb") as k:
         salt = k.read()
 
+def blob_integrity_verify():
+    with open(META_FILE, "r") as blob_meta:
+        vault_meta = json.load(blob_meta)
+
+        expected_blobs = vault_meta["blobs"]
+        for blob_name in expected_blobs:
+            blob_path = PASSCORE_DIR / blob_name
+            if not blob_path.exists():
+                raise FileNotFoundError(print(f"Missing blob: {blob_name}"))
+            
+            actual_size = blob_path.stat().st_size
+            expected_size = expected_blobs[blob_name]
+            if actual_size != expected_size:
+                raise ValueError(f"blob size mismatch.!: {blob_name}")
+            
+            actual_blobs = [
+                blobs.name
+                for blobs in PASSCORE_DIR.iterdir()
+                if blobs.match("blob_*.bin")
+            ]
+            if len(actual_blobs) != vault_meta["blob_count"]:
+                raise ValueError("blob count mismatch.!")
+
 def merge_blob_bin():
     blobs = [
         f.name
@@ -261,6 +284,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             return
 
         try:
+            blob_integrity_verify()
             merge_blob_bin()
 
         except FileNotFoundError:
