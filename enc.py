@@ -1,4 +1,4 @@
-import os, struct, json, platform
+import os, struct, json, platform, hashlib
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -50,20 +50,29 @@ else:
     with open(SALT_FILE, "rb") as k:
         salt = k.read()
 
+def sha256_blob(shafile_path):
+    hh = hashlib.sha256() # hash helper to cross check modifixation of any blobs
+
+    with open(shafile_path, "rb") as bsha:
+        while chunk := bsha.read(8192): # Read 8KB at a time 
+            hh.update(chunk)
+
+    return hh.hexdigest() # return hexadecimal hash string.!
+
 def blob_integrity_verify():
     with open(META_FILE, "r") as blob_meta:
         vault_meta = json.load(blob_meta)
 
-        expected_blobs = vault_meta["blobs"]
+        expected_blobs = vault_meta["blobs"] # outputs the blob dict from metadata.
         for blob_name in expected_blobs:
-            blob_path = PASSCORE_DIR / blob_name
+            blob_path = PASSCORE_DIR / blob_name # existing blobs path
             if not blob_path.exists():
-                raise FileNotFoundError(print(f"Missing blob: {blob_name}"))
+                raise FileNotFoundError(print(f"Missing blob.: {blob_name}"))
             
-            actual_size = blob_path.stat().st_size
-            expected_size = expected_blobs[blob_name]
-            if actual_size != expected_size:
-                raise ValueError(f"blob size mismatch.!: {blob_name}")
+            actual_size = blob_path.stat().st_size # outputs file size of blobs (each blob)
+            expected_size = expected_blobs[blob_name]["size"] # Store size of a blob from metadata.
+            if actual_size != expected_size: # Compares the physcially stored blob with metadata blobs sizes.!
+                raise ValueError(f"blob size mismatch.: {blob_name}")
             
             actual_blobs = [
                 blobs.name
@@ -72,6 +81,11 @@ def blob_integrity_verify():
             ]
             if len(actual_blobs) != vault_meta["blob_count"]:
                 raise ValueError("blob count mismatch.!")
+            
+            expected_hash = expected_blobs[blob_name]["sha256"] # outputs stored hash of existing blob
+            actual_hash = sha256_blob(blob_path) # generate hash for existing blob
+            if actual_hash != expected_hash:
+                raise ValueError(f"Hash mismatch.: {blob_name}")
 
 def merge_blob_bin():
     blobs = [
@@ -86,7 +100,7 @@ def merge_blob_bin():
         for blobs in sorted(PASSCORE_DIR.iterdir()):
             if blobs.match("blob_*.bin"):
 
-                with open(PASSCORE_DIR / blobs, "rb") as src_blob:
+                with open(PASSCORE_DIR / blobs, "rb") as src_blob: # Merge all the blobs exists in PASSCORE_DIR to generate bin cache for after use in Decryption.!
                     dst_bin.write(src_blob.read())
 
 def split_file_bin(file_bin, chunk_size=64):
@@ -141,7 +155,10 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
     for file_bin in PASSCORE_DIR.iterdir():
         if file_bin.match("blob_*.bin"):
             size = file_bin.stat().st_size
-            blob_data[file_bin.name] = size
+            blob_data[file_bin.name] = {
+                "size": size,
+                "sha256": sha256_blob(file_bin)
+            }
             total_size += size
     print("================================================")
     print(f"Working bin: {WORKING_BIN.stat().st_size} bytes")
