@@ -1,3 +1,5 @@
+![PassCore UI](assets/PassCoreUI_test01.png)
+
 # PassCore
 
 A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
