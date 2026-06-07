@@ -1,3 +1,8 @@
+#local files should be ignored.!!
+*.bin
+*.txt
+*.key
+*.salt
 
 # Vscode
 .vscode
