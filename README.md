@@ -2,7 +2,9 @@
 
 A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
 
-> **Project Status:** Active Development (v1.1-core)
+> **Project Status:** Active Development (v1.4-dev)
+
+---
 
 ## Features
 
@@ -14,19 +16,25 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * Length-prefixed encrypted record format
 * Vault lock/unlock workflow
 * Save-before-exit protection
+* Automatic vault autosave
 * First-run vault initialization
 * Vault metadata management
 * Blob-based encrypted storage architecture
+* SHA256 blob integrity verification
+* XDG-compliant storage layout
+* Cross-platform path abstraction
 * PySide6 graphical user interface
+
+---
 
 ## Current Architecture
 
 ```text
-Master Password
+  Master Password
         ↓
      Argon2id
         ↓
-  Vault Encryption Key
+Vault Encryption Key
         ↓
      AES-GCM
         ↓
@@ -47,22 +55,34 @@ Temporary Working Vault
 Persistent Storage
 ```
 
-Vault unlock flow:
+### Vault Unlock Flow
 
 ```text
 Encrypted Blobs
+        ↓
+meta.json Verification
+        ↓
+ Verify Blob Count
+        ↓
+Verify Blob Existence
+        ↓
+ Verify Blob Size
+        ↓
+  Verify SHA256
         ↓
 Blob Reconstruction
         ↓
 Temporary Working Vault
 (passwords.bin)
         ↓
- AES-GCM Decryption
+AES-GCM Decryption
         ↓
- Vault Editor
+   Vault Editor
 ```
 
 After encryption and blob generation, the temporary working vault is automatically removed from cache storage.
+
+---
 
 ## Security Design
 
@@ -117,6 +137,8 @@ During unlock:
 ```text
    Blob Storage
         ↓
+Verify Integrity
+        ↓
      Rebuild
         ↓
   Encrypted Vault
@@ -125,6 +147,51 @@ During unlock:
 ```
 
 The blob architecture is intended to reduce direct exposure of vault storage and provide a foundation for future distributed storage strategies.
+
+### Blob Integrity Verification
+
+Before vault reconstruction, PassCore validates stored blobs using metadata recorded in `meta.json`.
+
+Verification includes:
+
+* Blob count verification
+* Blob existence verification
+* Blob size verification
+* SHA256 hash verification
+
+Verification flow:
+
+```text
+    meta.json
+        ↓
+ Verify Blob Count
+        ↓
+Verify Blob Existence
+        ↓
+  Verify Blob Size
+        ↓
+  Verify SHA256
+        ↓
+Blob Reconstruction
+        ↓
+Vault Decryption
+```
+
+This allows PassCore to distinguish between:
+
+```text
+Wrong Master Password
+```
+
+and
+
+```text
+Vault Corruption
+```
+
+before attempting decryption.
+
+---
 
 ## Current Capabilities
 
@@ -142,8 +209,14 @@ The blob architecture is intended to reduce direct exposure of vault storage and
 * Temporary vault cleanup
 * Wrong-password detection
 * Corruption detection
+* Blob count verification
+* Blob existence verification
+* Blob size verification
+* SHA256 blob integrity verification
 * XDG-compliant storage layout
 * Cross-platform path abstraction
+
+---
 
 ## Planned Features
 
@@ -155,7 +228,6 @@ The blob architecture is intended to reduce direct exposure of vault storage and
 
 ### Security
 
-* Blob integrity verification
 * Secure overwrite before file deletion
 * Optional memory-only reconstruction
 * Vault health diagnostics
@@ -167,6 +239,8 @@ The blob architecture is intended to reduce direct exposure of vault storage and
 * Password generator
 * Auto-lock timer
 * Cross-platform packaging
+
+---
 
 ## Roadmap
 
@@ -182,13 +256,14 @@ The blob architecture is intended to reduce direct exposure of vault storage and
 * [x] Autosave workflow
 * [x] XDG storage layout
 * [x] Temporary vault cleanup
-* [ ] Blob integrity verification
+* [x] Blob integrity verification
 * [ ] Distributed blob storage
 * [ ] Backup and recovery
 * [ ] Password generator
 * [ ] Auto-lock timer
 * [ ] Cross-platform release
 
+---
 
 ## Requirements
 
@@ -206,8 +281,10 @@ git clone https://github.com/Money-Ape/PassCore.git
 cd PassCore
 
 chmod +x run.sh
-./run.sh # running bash will auto install the required dependencies 
+./run.sh
 ```
+
+The installation script automatically installs required dependencies.
 
 ---
 
@@ -234,4 +311,3 @@ PassCore is an educational and experimental project.
 It has not undergone a professional security audit and should not yet be considered production-ready for storing highly sensitive information.
 
 While PassCore implements modern cryptographic primitives such as Argon2id and AES-GCM, users should review the source code carefully before relying on it for critical data protection.
-
