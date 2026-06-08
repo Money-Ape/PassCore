@@ -104,7 +104,7 @@ def merge_blob_bin():
                 with open(PASSCORE_DIR / blobs, "rb") as src_blob: # Merge all the blobs exists in PASSCORE_DIR to generate bin cache for after use in Decryption.!
                     dst_bin.write(src_blob.read())
 
-def split_file_bin(file_bin, chunk_size=64):
+def split_file_bin(file_bin, chunk_size=32):
     for exist_blob in PASSCORE_DIR.iterdir():
         if exist_blob.name.startswith("blob_") and exist_blob.suffix == ".bin":
             print(f"{BLUE}DELETING_existing {exist_blob.name}{RESET}")
@@ -291,6 +291,12 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             close_btn.show()
             lock_btn.show()
             unlock_btn.hide()
+
+            editor.clear()
+            editor.setReadOnly(False)
+            window.status_label.setText("Unlocked")
+            save_btn.setEnabled(True)
+            lock_btn.setEnabled(True)
 
             QMessageBox.information(
                 window, "PassCore", "Create your first vault"

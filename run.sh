@@ -3,7 +3,7 @@
 modules=$(python - << 'EOF'
 import importlib, sys
 
-modules = ["cryptography", "argon2"]
+modules = ["cryptography", "argon2", "PySide6"]
 missing = []
 for mod in modules:
     try:
@@ -28,7 +28,8 @@ if [ -f /etc/os-release ]; then
         if [ $modules_missing -ne 0 ]; then
             sudo pacman -Syy python-cryptography \
             python-argon2-cffi \
-            python-argon2-cffi-bindings
+            python-argon2-cffi-bindings \
+            pyside6
         else
             echo "Initializing....."
         fi
@@ -36,7 +37,8 @@ if [ -f /etc/os-release ]; then
     elif [ "$System_ID" = "debian" ] || [ "$System_ID" = "ubuntu" ]; then
         if [ $modules_missing -ne 0 ]; then
             sudo apt-get update; sudo apt-get install python3-cryptography \
-            python3-argon2
+            python3-argon2 \
+            pyside6
         else
             echo "Initializing....."
         fi
