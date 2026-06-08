@@ -1,10 +1,10 @@
-![PassCore UI](assets/PassCoreUI_test01.png)
-
 # PassCore
+
+![PassCore UI](assets/PassCoreUI_test01.png)
 
 A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
 
-> **Project Status:** Active Development (v1.4-dev)
+> **Project Status:** Alpha Pre-release (v0.1.5-alpha)
 
 ---
 
@@ -86,9 +86,9 @@ After encryption and blob generation, the temporary working vault is automatical
 
 ---
 
-## Security Design
+# Security Design
 
-### Key Derivation
+## Key Derivation
 
 PassCore derives vault encryption keys from a master password using Argon2id.
 
@@ -104,9 +104,13 @@ PassCore derives vault encryption keys from a master password using Argon2id.
      AES-GCM
 ```
 
-### Storage Layout
+---
 
-Linux systems use XDG-compliant storage locations:
+## Storage Layout
+
+PassCore uses platform-appropriate storage locations.
+
+### Linux (XDG Compliant)
 
 ```text
 ~/.local/share/passcore/
@@ -120,9 +124,25 @@ Linux systems use XDG-compliant storage locations:
 └── passwords.bin (temporary)
 ```
 
+### Windows
+
+```text
+%APPDATA%\PassCore\
+├── vault.salt
+├── meta.json
+├── blob_0000.bin
+├── blob_0001.bin
+└── ...
+
+%LOCALAPPDATA%\PassCore\Cache\
+└── passwords.bin (temporary)
+```
+
 The temporary working vault is reconstructed only when needed and is automatically removed after encryption and blob generation.
 
-### Blob Architecture
+---
+
+## Blob Architecture
 
 Encrypted vault data is split into multiple binary blobs after encryption.
 
@@ -150,7 +170,9 @@ Verify Integrity
 
 The blob architecture is intended to reduce direct exposure of vault storage and provide a foundation for future distributed storage strategies.
 
-### Blob Integrity Verification
+---
+
+## Blob Integrity Verification
 
 Before vault reconstruction, PassCore validates stored blobs using metadata recorded in `meta.json`.
 
@@ -197,26 +219,45 @@ before attempting decryption.
 
 ## Current Capabilities
 
+### Vault Operations
+
 * Vault creation
 * Vault initialization metadata
 * Master password authentication
-* Argon2id key derivation
-* AES-GCM authenticated encryption
 * Vault locking and unlocking
 * Save vault contents
 * Save-before-close workflow
 * Automatic vault autosave
+
+### Cryptography
+
+* Argon2id key derivation
+* AES-GCM authenticated encryption
+* Wrong-password detection
+
+### Storage System
+
 * Blob generation
 * Blob reconstruction
 * Temporary vault cleanup
-* Wrong-password detection
+* XDG-compliant storage layout
+* Cross-platform path abstraction
+
+### Integrity Verification
+
 * Corruption detection
 * Blob count verification
 * Blob existence verification
 * Blob size verification
 * SHA256 blob integrity verification
-* XDG-compliant storage layout
-* Cross-platform path abstraction
+
+### User Interface
+
+* PySide6 desktop application
+* Vault status indicators
+* Save tracking
+* Lock screen support
+* Backend-integrated GUI
 
 ---
 
@@ -257,13 +298,25 @@ before attempting decryption.
 * [x] Save-before-exit protection
 * [x] Autosave workflow
 * [x] XDG storage layout
+* [x] Windows storage layout
 * [x] Temporary vault cleanup
 * [x] Blob integrity verification
+* [x] PySide6 desktop interface
 * [ ] Distributed blob storage
 * [ ] Backup and recovery
 * [ ] Password generator
 * [ ] Auto-lock timer
-* [ ] Cross-platform release
+* [ ] Cross-platform packaging
+
+---
+
+## Platform Support
+
+| Platform           | Status   |
+| ------------------ | -------- |
+| Linux (Arch Linux) | ✅ Tested |
+| Windows 10         | ✅ Tested |
+| Windows 11         | ✅ Tested |
 
 ---
 
@@ -278,6 +331,8 @@ before attempting decryption.
 
 ## Installation
 
+### Linux
+
 ```bash
 git clone https://github.com/Money-Ape/PassCore.git
 cd PassCore
@@ -286,11 +341,28 @@ chmod +x run.sh
 ./run.sh
 ```
 
-The installation script automatically installs required dependencies.
+### Windows
+
+```text
+git clone https://github.com/Money-Ape/PassCore.git
+cd PassCore
+
+Double-click run.bat
+```
+
+The Windows launcher automatically:
+
+* Creates a virtual environment (if missing)
+* Installs required dependencies
+* Launches PassCore
+
+The Linux launcher performs equivalent dependency checks and initialization.
 
 ---
 
 ## Project Structure
+
+### Linux
 
 ```text
 ~/.local/share/passcore/
@@ -304,6 +376,20 @@ The installation script automatically installs required dependencies.
 └── passwords.bin (temporary)
 ```
 
+### Windows
+
+```text
+%APPDATA%\PassCore\
+├── vault.salt
+├── meta.json
+├── blob_0000.bin
+├── blob_0001.bin
+└── ...
+
+%LOCALAPPDATA%\PassCore\Cache\
+└── passwords.bin (temporary)
+```
+
 ---
 
 ## Disclaimer
@@ -313,3 +399,9 @@ PassCore is an educational and experimental project.
 It has not undergone a professional security audit and should not yet be considered production-ready for storing highly sensitive information.
 
 While PassCore implements modern cryptographic primitives such as Argon2id and AES-GCM, users should review the source code carefully before relying on it for critical data protection.
+
+---
+
+## License
+
+This project is currently released for educational and research purposes. Future licensing terms may evolve as the project matures.
