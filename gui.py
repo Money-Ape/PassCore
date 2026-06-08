@@ -169,8 +169,6 @@ class PassCoreUI(QMainWindow):
         self.save_btn.setEnabled(False)
 
         # Connections
-        self.lock_btn.clicked.connect(self.vault_lock)
-        self.unlock_btn.clicked.connect(self.unlock_vault)
         self.save_btn.clicked.connect(self.save_vault)
         self.close_btn.clicked.connect(self.vault_close)
 
@@ -252,34 +250,6 @@ class PassCoreUI(QMainWindow):
 
         root_layout.addWidget(sidebar)
 
-    # ==================================================
-    # Actions
-    def vault_lock(self):
-        if not self.editor.isReadOnly():
-            self.vault_text = self.editor.toPlainText()
-
-        self.editor.setPlainText(self.lock_screen)
-        self.editor.setReadOnly(True)
-        self.status_label.setText("Locked")
-        self.status_label.setStyleSheet("""
-            border: none;
-            color: red;
-            font-size: 12pt;
-            font-weight: bold;
-        """)
-
-    def unlock_vault(self):
-        self.editor.setPlainText(self.vault_text)
-        self.editor.setReadOnly(False)
-
-        self.status_label.setText("Unlocked")
-        self.status_label.setStyleSheet("""
-            border: none;
-            color: green;
-            font-size: 12pt;
-            font-weight: bold;
-        """)
-
     def save_vault(self):
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.save_label.setText(
@@ -289,9 +259,9 @@ class PassCoreUI(QMainWindow):
     def vault_close(self):
         self.close()
 
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = PassCoreUI()
+    window.show()
 
-app = QApplication(sys.argv)
-window = PassCoreUI()
-window.show()
-
-sys.exit(app.exec())
+    sys.exit(app.exec())
