@@ -347,7 +347,7 @@ chmod +x run.sh
 git clone https://github.com/Money-Ape/PassCore.git
 cd PassCore
 
-Double-click run.bat
+Double-click windows.bat
 ```
 
 The Windows launcher automatically:
