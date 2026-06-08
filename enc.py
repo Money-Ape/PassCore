@@ -1,3 +1,4 @@
+from gui import PassCoreUI
 import os, struct, json, platform, hashlib
 from pathlib import Path
 from datetime import datetime
@@ -214,11 +215,13 @@ def vault_lock(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
     )
     if reply == QMessageBox.Yes:
-        editor.clear()
-        editor.hide()
-        save_btn.hide()
-        close_btn.hide()
-        lock_btn.hide()
+        editor.setPlainText(window.lock_screen)
+        editor.setReadOnly(True)
+        window.status_label.setText("Locked")
+
+        lock_btn.setEnabled(False)
+        save_btn.setEnabled(False)
+        unlock_btn.setEnabled(True)
         QMessageBox.information(window, "PassCore", "Vault Locked.!")
 
         unlock_btn.show()
@@ -339,6 +342,11 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             close_btn.show()
             lock_btn.show()
             editor.setPlainText("\n".join(vault_lines))
+            editor.setReadOnly(False)
+            window.status_label.setText("Unlocked")
+
+            save_btn.setEnabled(True)
+            lock_btn.setEnabled(True)
             return
         
         except InvalidTag:
@@ -348,11 +356,15 @@ def autosave_vault(window, editor):
     if window.key is None:
         return
     
-    save_vault(editor, window.key)
+    save_vault(window, editor, window.key)
 
-def save_vault(editor, key):
+def save_vault(window, editor, key):
     new_lines = editor.toPlainText().splitlines()
     encrypt_vault(new_lines, key)
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    window.save_label.setText(
+        f"Last Save\n{timestamp}"
+    )
     QMessageBox.information(None, "PassCore", "Vault saved successfully.!")
 
 def vault_close(window, editor, key):
@@ -375,29 +387,17 @@ def vault_close(window, editor, key):
 
 def user_edit():
     app = QApplication([])
-    window = QMainWindow()
+    window = PassCoreUI()
     window.key = None
-    window.setWindowTitle(f"PassCore: {os.getcwd()}")
-    window.setFixedSize(900, 700)
-    editor = QTextEdit()
-    container = QWidget() # QWidget container
-    layout = QVBoxLayout(container) # Vertical layout
-    btn_layout = QHBoxLayout() # Horizontal layout
+    editor = window.editor
     
-    save_btn = QPushButton("Save") # save 
-    close_btn = QPushButton("Close") # close
-    lock_btn = QPushButton("Lock Vault") # lock vault again
-    unlock_btn = QPushButton("Unlock Vault") # unlock vault again
-    unlock_btn.hide()
+    save_btn = window.save_btn
+    close_btn = window.close_btn
+    lock_btn = window.lock_btn
+    unlock_btn = window.unlock_btn
 
-    btn_layout.addWidget(save_btn)
-    btn_layout.addWidget(close_btn)
-    btn_layout.addWidget(lock_btn)
-    btn_layout.addWidget(unlock_btn)
-
-    layout.addWidget(editor)
-    layout.addLayout(btn_layout)
-    window.setCentralWidget(container)
+    window.save_btn.clicked.disconnect()
+    window.close_btn.clicked.disconnect()
 
     autosave_timer = QTimer() # Autosave Timer 
     autosave_timer.setSingleShot(True) # Trigger autosave timer : True
@@ -411,7 +411,7 @@ def user_edit():
     unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
     
     save_btn.clicked.connect(
-        lambda: save_vault(editor, window.key)
+        lambda: save_vault(window, editor, window.key)
     )
 
     close_btn.clicked.connect(
@@ -423,7 +423,6 @@ def user_edit():
     unlock_btn.clicked.connect(
         lambda: unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
     )
-    
     window.show()
     app.exec()
 
