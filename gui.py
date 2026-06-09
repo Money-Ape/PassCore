@@ -1,6 +1,9 @@
-import sys
+import sys, os, subprocess, json
+from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame)
+from PySide6.QtGui import QAction
+from backup import create_backup, restore_backup, META_FILE
 
 class PassCoreUI(QMainWindow):
     def __init__(self):
@@ -31,7 +34,7 @@ class PassCoreUI(QMainWindow):
             "wwww wwwwww w wwwwwwww wwwwwwwwwwww w wwwwwwwwwww wwwwww\n"
             "wwwwwwwwwwwwwwwww wwwwwwwwwwwwwwwww wwwwww www\n"
         )
-
+        self.update_vault_size()
         self.vault_text = None
         self.editor.setPlainText(self.lock_screen)
 
@@ -43,12 +46,30 @@ class PassCoreUI(QMainWindow):
                 background-color: #FFF8FA;
                 color: #202020;
             }
-
             QMenuBar {
+                background: #FFF8FA;
                 color: #202020;
             }
-
+            QMenuBar::item {
+                background: transparent;
+                color: #202020;
+                padding: 6px 10px;
+            }
+            QMenuBar::item:selected {
+                background: #D8B8C4;
+                border-radius: 4px;
+            }
             QMenu {
+                background: #FFF8FA;
+                color: #202020;
+                border: 2px solid #D8B8C4;
+            }
+            QMenu::item {
+                padding: 6px 20px;
+                color: #202020;
+            }
+            QMenu::item:selected {
+                background: #D8B8C4;
                 color: #202020;
             }
         """)
@@ -56,9 +77,23 @@ class PassCoreUI(QMainWindow):
         # Menu Bar
         menu = self.menuBar()
         menu.addMenu("File")
-        menu.addMenu("Edit")
-        menu.addMenu("View")
+        
+        edit_menu = menu.addMenu("Edit")
+        create_backup_action = QAction("Create Backup", self)
+        create_backup_action.triggered.connect(self.create_backup_now)
+        edit_menu.addAction(create_backup_action)
+        
+        restore_backup_action = QAction("Restore Backup", self)
+        restore_backup_action.triggered.connect(self.restore_backup_now)
+        edit_menu.addAction(restore_backup_action)
+        
+        view_menu = menu.addMenu("View")
+        backup_folder_action = QAction("Open Backup Folder", self)
+        backup_folder_action.triggered.connect(self.open_backup_folder)
+        view_menu.addAction(backup_folder_action)
+        
         menu.addMenu("Help")
+
 
         # Central Widget
         central = QWidget()
@@ -137,13 +172,12 @@ class PassCoreUI(QMainWindow):
                 font-weight: bold;
             }
         """)
-
         # ==================================================
         # Vault Size
         self.size_label = QLabel(
             "Size\n0 bytes"
         )
-        self.size_label.setStyleSheet(info_style)
+        self.size_label.setStyleSheet(info_style)        
 
         # ==================================================
         # Last Save
@@ -250,11 +284,68 @@ class PassCoreUI(QMainWindow):
 
         root_layout.addWidget(sidebar)
 
+    def create_backup_now(self):
+        create_backup()
+        self.update_vault_size()
+
+    def restore_backup_now(self):
+        restore_backup()
+        self.update_vault_size()
+
+    def open_backup_folder(self):
+        backup_dir = Path.home() / "Documents" / "PassCore Backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+        if sys.platform.startswith("linux"):
+            subprocess.Popen(
+                ["xdg-open", str(backup_dir)]
+            )
+        elif sys.platform == "win32":
+            os.startfile(backup_dir)
+        
+        elif sys.platform == "darwin":
+            subprocess.Popen(
+                ["open", str(backup_dir)]
+            )
+
+    def vault_corrupted(self):
+        self.status_label.setText(
+            "Corrupted"
+        )
+        self.status_label.setStyleSheet("""
+            QLabel {
+                border: None;
+                background: transparent;
+                color: #E67E22;
+                font-size: 15pt;
+                font-weight: bold;                         
+            }
+        """)
+        self.editor.setPlainText(
+            "Vault Integrity Verification Failed.!",
+        )
+
+    def update_vault_size(self):
+        if not META_FILE.exists():
+            self.size_label.setText(
+                "Size\n0 bytes"
+            )
+            return
+            
+        with open(META_FILE, "r") as meta:
+            vault_meta = json.load(meta)
+        
+        size = vault_meta.get("total_size", 0)
+        self.size_label.setText(
+            f"Size\n{size} bytes"
+        )
+
     def save_vault(self):
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.save_label.setText(
             f"Last Save\n{timestamp}"
         )
+        self.update_vault_size()
 
     def vault_close(self):
         self.close()

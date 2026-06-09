@@ -1,5 +1,6 @@
 from gui import PassCoreUI
-import os, struct, json, platform, hashlib
+from backup import create_backup
+import os, struct, json, platform, hashlib, zipfile
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -61,6 +62,9 @@ def sha256_blob(shafile_path):
     return hh.hexdigest() # return hexadecimal hash string.!
 
 def blob_integrity_verify():
+    if not META_FILE.exists():
+        raise FileNotFoundError("Metadata file is missing")
+        
     with open(META_FILE, "r") as blob_meta:
         vault_meta = json.load(blob_meta)
 
@@ -68,25 +72,25 @@ def blob_integrity_verify():
         for blob_name in expected_blobs:
             blob_path = PASSCORE_DIR / blob_name # existing blobs path
             if not blob_path.exists():
-                raise FileNotFoundError(print(f"Missing blob.: {blob_name}"))
+                raise FileNotFoundError(f"Missing blob.: {blob_name}")
             
             actual_size = blob_path.stat().st_size # outputs file size of blobs (each blob)
             expected_size = expected_blobs[blob_name]["size"] # Store size of a blob from metadata.
             if actual_size != expected_size: # Compares the physcially stored blob with metadata blobs sizes.!
                 raise ValueError(f"blob size mismatch.: {blob_name}")
             
-            actual_blobs = [
-                blobs.name
-                for blobs in PASSCORE_DIR.iterdir()
-                if blobs.match("blob_*.bin")
-            ]
-            if len(actual_blobs) != vault_meta["blob_count"]:
-                raise ValueError("blob count mismatch.!")
-            
             expected_hash = expected_blobs[blob_name]["sha256"] # outputs stored hash of existing blob
             actual_hash = sha256_blob(blob_path) # generate hash for existing blob
             if actual_hash != expected_hash:
                 raise ValueError(f"Hash mismatch.: {blob_name}")
+            
+        actual_blobs = [
+            blobs.name
+            for blobs in PASSCORE_DIR.iterdir()
+            if blobs.match("blob_*.bin")
+        ]
+        if len(actual_blobs) != vault_meta["blob_count"]:
+            raise ValueError("blob count mismatch.!")
 
 def merge_blob_bin():
     blobs = [
@@ -142,7 +146,7 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
             # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
     if WORKING_BIN.exists():
-        split_file_bin(WORKING_BIN, chunk_size=64)
+        split_file_bin(WORKING_BIN, chunk_size=32)
     
     if META_FILE.exists():
         with open(META_FILE, "r") as meta_js:
@@ -310,7 +314,12 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             return
 
         try:
-            blob_integrity_verify()
+            try:
+                blob_integrity_verify()
+            except (FileNotFoundError, ValueError) as e:
+                window.vault_corrupted()
+                QMessageBox.information(window, "PassCore", str(e))
+                return
             merge_blob_bin()
 
         except FileNotFoundError:
@@ -366,6 +375,7 @@ def autosave_vault(window, editor):
 
 def save_vault(window, editor, key):
     new_lines = editor.toPlainText().splitlines()
+    create_backup()
     encrypt_vault(new_lines, key)
     timestamp = datetime.now().strftime("%H:%M:%S")
     window.save_label.setText(
@@ -390,7 +400,6 @@ def vault_close(window, editor, key):
     elif reply == QMessageBox.Cancel:
         return
 
-
 def user_edit():
     app = QApplication([])
     window = PassCoreUI()
@@ -408,7 +417,7 @@ def user_edit():
     autosave_timer = QTimer() # Autosave Timer 
     autosave_timer.setSingleShot(True) # Trigger autosave timer : True
     editor.textChanged.connect(
-        lambda: autosave_timer.start(30000) # Set autosave timer for 30s if changes appear in Editor.
+        lambda: autosave_timer.start(60000) # Set autosave timer for 60s(1 min) if changes appear in Editor.
     )
     autosave_timer.timeout.connect(
         lambda: autosave_vault(window, editor) # triggers autosave_vault() when key is None

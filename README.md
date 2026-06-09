@@ -4,7 +4,7 @@
 
 A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
 
-> **Project Status:** Alpha Pre-release (v0.1.5-alpha)
+> **Project Status:** Alpha Pre-release (v0.2.0-alpha)
 
 ---
 
@@ -23,6 +23,12 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * Vault metadata management
 * Blob-based encrypted storage architecture
 * SHA256 blob integrity verification
+* Automatic backup creation
+* Backup recovery system
+* Backup retention management
+* Vault corruption detection
+* GUI-integrated recovery workflow
+* Vault size tracking
 * XDG-compliant storage layout
 * Cross-platform path abstraction
 * PySide6 graphical user interface
@@ -217,6 +223,68 @@ before attempting decryption.
 
 ---
 
+## Backup and Recovery
+
+PassCore automatically creates compressed ZIP backups of vault storage data.
+
+Backups contain:
+
+* vault.salt
+* meta.json
+* All encrypted vault blobs
+
+Backups are stored separately from vault storage.
+
+### Linux
+
+```text
+~/Documents/PassCore Backups/
+```
+
+### Windows
+
+```text
+Documents\PassCore Backups\
+```
+
+---
+### Backup Workflow
+
+```text
+  Create Backup
+        ↓
+   ZIP Archive
+        ↓
+Backup Retention Check
+        ↓
+Keep Latest N Backups
+```
+
+### Recovery Workflow
+
+```text
+  Restore Backup
+        ↓
+  Extract Backup
+        ↓
+  Restore Blobs
+        ↓
+Integrity Verification
+        ↓
+   Vault Unlock
+```
+
+PassCore can recover from:
+
+* Missing blobs
+* Corrupted blobs
+* Accidental vault deletion
+* Failed vault modifications
+
+Backup retention automatically removes older backups after the configured limit is reached.
+
+---
+
 ## Current Capabilities
 
 ### Vault Operations
@@ -240,6 +308,9 @@ before attempting decryption.
 * Blob generation
 * Blob reconstruction
 * Temporary vault cleanup
+* Automatic backup creation
+* Backup recovery
+* Backup retention management
 * XDG-compliant storage layout
 * Cross-platform path abstraction
 
@@ -255,8 +326,11 @@ before attempting decryption.
 
 * PySide6 desktop application
 * Vault status indicators
+* Vault corruption indicators
 * Save tracking
+* Vault size tracking
 * Lock screen support
+* Backup management menu
 * Backend-integrated GUI
 
 ---
@@ -266,7 +340,6 @@ before attempting decryption.
 ### Storage
 
 * Distributed blob locations
-* Automatic vault backups
 * Vault export/import
 
 ### Security
@@ -301,9 +374,9 @@ before attempting decryption.
 * [x] Windows storage layout
 * [x] Temporary vault cleanup
 * [x] Blob integrity verification
+* [x] Backup and recovery
 * [x] PySide6 desktop interface
 * [ ] Distributed blob storage
-* [ ] Backup and recovery
 * [ ] Password generator
 * [ ] Auto-lock timer
 * [ ] Cross-platform packaging
@@ -326,7 +399,6 @@ before attempting decryption.
 * cryptography
 * argon2-cffi
 * PySide6
-
 ---
 
 ## Installation
@@ -357,38 +429,6 @@ The Windows launcher automatically:
 * Launches PassCore
 
 The Linux launcher performs equivalent dependency checks and initialization.
-
----
-
-## Project Structure
-
-### Linux
-
-```text
-~/.local/share/passcore/
-├── vault.salt
-├── meta.json
-├── blob_0000.bin
-├── blob_0001.bin
-└── ...
-
-~/.cache/passcore/
-└── passwords.bin (temporary)
-```
-
-### Windows
-
-```text
-%APPDATA%\PassCore\
-├── vault.salt
-├── meta.json
-├── blob_0000.bin
-├── blob_0001.bin
-└── ...
-
-%LOCALAPPDATA%\PassCore\Cache\
-└── passwords.bin (temporary)
-```
 
 ---
 
