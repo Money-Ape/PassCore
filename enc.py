@@ -219,6 +219,7 @@ def vault_lock(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
     )
     if reply == QMessageBox.Yes:
+        os.remove(WORKING_BIN)
         editor.setPlainText(window.lock_screen)
         editor.setReadOnly(True)
         window.status_label.setText("Locked")
@@ -394,6 +395,7 @@ def vault_close(window, editor, key):
         print(f"{YELLOW}bye.!{RESET}")
     
     elif reply == QMessageBox.No:
+        os.remove(WORKING_BIN)
         window.close()
         print(f"{YELLOW}bye.!{RESET}")
     
