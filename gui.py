@@ -2,7 +2,7 @@ import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame)
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QIcon, QPixmap
 from backup import create_backup, restore_backup, META_FILE
 
 class PassCoreUI(QMainWindow):
@@ -10,28 +10,39 @@ class PassCoreUI(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("PassCore vault")
+        self.setWindowIcon(
+            QIcon("assets/PassCore.png")
+        )
         self.resize(1100, 700)
         self.build_ui()
         self.lock_screen = (
             "mww mww hwm wwl mwwMmwwww wwwmmmwww mwww wwl w wlwwww\n"
             "wwwww nwwwwwww n lwwwww w wwwww mwww nwwwwwww Nw mww w lwwww nwwwww\n"
             "wwww wwwwww w wwwwwwww wwwwww wwww w w w wwwwww\n"
+            "nralq hwemi xouar mwehn ilqra uxmwo lhewr qnaim xoura mhnew"
             "lwwww wwwwww w wwwwww wwwwwwwwwww wwwwww Mwww wwwwww\n"
             "lwwww wwwwwwwwwwwwww Mwwwwwwwwwwwwwwww Mwww wwwwww\n\n"
             "wwwl wwww Mwww lwwww w wwwwwwwwwwwwww w wwwwwwww mwww wwww lwwwww\n"
+            "mhae qrnli xouar mhnew ilaqr uxwmo qreni hlnwr qmrai woehn ilaqx murnw qlaei"
             "lwwwww w lwwwww wwww wwwwwwwwwwwwwwwww wwww wwwwwwwwww wwwwww Wwww\n"
             "wwwwwwwwwww wwww w wwwww wwww wwwwwwwwwwwwww Mwwwwww wwwww w www lwwwwwwww\n"
             "wwww wwww lwwww www lwwwwwwwwwwwwwwww wwwwwww wwwww wwwwwwww N w\n"
             "wwwwww wwwwwwwwww\n\n"
+            "wlaeq hrnmi xouar mnewh ilaqr uxwmo mhawe qrnli xouar mhnew ilaqx"
             "w wwwwww w w wwwww wwwwwwww Mwww Mwww lwwww wwww w wwwwwwwwwwwwww\n"
             "w wwwwwwwwww Mwww wwww lwwwwwwww w wwwwwwww wwww wwwwwwwwwwww\n"
             "Mwwwwwwwwwwww Mwww w wwwww wwww wwwwwwwwwwwwwwww Mwwwwww wwwww w www\n"
+            "nralq hwemi xouar mwehn ilqra uxmwo lhewr qnaim xoura mhnew ilaqx"
             "wwwwwwwwww wwwwww www w www wwwwww wwwww Mwwww wwwww\n"
             "wwwwwwwwwwwww wwwwwwwwwwwwww Mwwww www.\n\n"
+            "xuaem hlnwr qmrai woehn ilaqx murnw qlaei mhawe qrnli xouar mhnew ilaqx"
             "w lwwwww wwwwwww w wwwwwwww w wwwwwww wwww wwwwwwww w wwww w\n"
             "Mwww wwwwwww wwww w wwwwwwwwww wwwwwwwww wwww wwwwwwww wwww M w w\n"
             "Mwwww wwwwwwwwww wwww w wwwwwwwww wwwwwwwwwwwwwwww w wwwwwwwwwww Mwww\n"
+            "qreim xonua hmrwe inuia lxqro haemn qlwir xouma rnhew ilaqr umxwo"
             "wwww wwwwww w wwwwwwww wwwwwwwwwwww w wwwwwwwwwww wwwwww\n"
+            "xuaem hlnwr qmrai woehn ilaqx murnw qlaei mhawe qrnli xouar"
+            "mhae qrnli xouar mhnew ilaqr uxwmo qreni hlnwr qmrai"
             "wwwwwwwwwwwwwwwww wwwwwwwwwwwwwwwww wwwwww www\n"
         )
         self.update_vault_size()
@@ -325,6 +336,14 @@ class PassCoreUI(QMainWindow):
             "Vault Integrity Verification Failed.!",
         )
 
+    def size_calc(self, size):
+        units = ["Bytes", "KB", "MB", "GB", "TB"]
+        for unit in units:
+            if size < 1024 or unit == "TB":
+                return f"{size:.2f} {unit}"
+            size /= 1024
+        return f"{size:.2f} PB"
+
     def update_vault_size(self):
         if not META_FILE.exists():
             self.size_label.setText(
@@ -336,8 +355,9 @@ class PassCoreUI(QMainWindow):
             vault_meta = json.load(meta)
         
         size = vault_meta.get("total_size", 0)
+        read_size = self.size_calc(size)
         self.size_label.setText(
-            f"Size\n{size} bytes"
+            f"Size\n{read_size}"
         )
 
     def save_vault(self):

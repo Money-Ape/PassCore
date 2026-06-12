@@ -1,11 +1,11 @@
 from gui import PassCoreUI
 from backup import create_backup
-import os, struct, json, platform, hashlib, zipfile
+import os, struct, json, platform, hashlib
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
-from PySide6.QtWidgets import(QWidget ,QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QTextEdit, QInputDialog, QLineEdit, QPushButton, QMessageBox)
+from PySide6.QtWidgets import(QApplication, QInputDialog, QLineEdit, QMessageBox, QFileDialog)
 from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
 
@@ -214,12 +214,13 @@ def decrypt_vault(key):
     
     return vault_lines
 
-def vault_lock(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
+def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
     reply = QMessageBox.question(
         window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
     )
     if reply == QMessageBox.Yes:
-        os.remove(WORKING_BIN)
+        if WORKING_BIN.exists():
+            os.remove(WORKING_BIN)
         editor.setPlainText(window.lock_screen)
         editor.setReadOnly(True)
         window.status_label.setText("Locked")
@@ -239,7 +240,6 @@ def is_first_run():
     return not META_FILE.exists()
 
 def init_vault():
-    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     vault_meta = {}
     blob_data = {}
@@ -333,6 +333,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             window, "Unlock Vault",
             f"Master Passwd: ", QLineEdit.Password
         )
+        
         if not ok:
             window.close()
             return
@@ -395,7 +396,9 @@ def vault_close(window, editor, key):
         print(f"{YELLOW}bye.!{RESET}")
     
     elif reply == QMessageBox.No:
-        os.remove(WORKING_BIN)
+        if WORKING_BIN.exists():
+            os.remove(WORKING_BIN)
+
         window.close()
         print(f"{YELLOW}bye.!{RESET}")
     
@@ -435,7 +438,7 @@ def user_edit():
         lambda: vault_close(window, editor, window.key))
     
     lock_btn.clicked.connect(
-        lambda: vault_lock(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
+        lambda: vault_lock(window, editor, save_btn, unlock_btn, lock_btn)
     )
     unlock_btn.clicked.connect(
         lambda: unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
