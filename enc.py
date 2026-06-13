@@ -1,11 +1,11 @@
-from gui import PassCoreUI
+from gui import PassCoreUI, PasswordDialog
 from backup import create_backup
 import os, struct, json, platform, hashlib, uuid, shutil
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
-from PySide6.QtWidgets import(QApplication, QInputDialog, QLineEdit, QMessageBox, QFileDialog)
+from PySide6.QtWidgets import(QApplication, QInputDialog, QLineEdit, QMessageBox)
 from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
 
@@ -304,13 +304,13 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
     while True:
         if is_first_run():            
             init_vault(window)
-            masterpasswd, ok = QInputDialog.getText(
-                window, "Unlock Vault",
-                f"Set your master password: ", QLineEdit.Password
-            )
+            dialog = PasswordDialog(title="Create Vault", confirm=True)
+            ok = dialog.exec()
+
             if not ok:
                 window.close()
                 return
+            masterpasswd = dialog.password.text()
             
             # Generates key for first run.!
             key = hash_secret_raw(
@@ -361,10 +361,13 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             )
             return
         
-        masterpasswd, ok = QInputDialog.getText(
-            window, "Unlock Vault",
-            f"Master Passwd: ", QLineEdit.Password
-        )
+        dialog = PasswordDialog(title="Unlock Vault", confirm=False)
+        ok = dialog.exec()
+
+        if not ok:
+            window.close()
+            return
+        masterpasswd = dialog.password.text()
         
         if not ok:
             window.close()

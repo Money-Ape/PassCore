@@ -1,9 +1,19 @@
-import os, zipfile, platform
+import os, zipfile, platform, json, shutil
 from datetime import datetime
 from pathlib import Path
 
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
 RESET = "\033[0m"
+
+def get_container_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path.home() / ".local" / "share" / ".passcore_db"
+    
+    elif sys == "Windows":
+        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
 
 def get_PassCore_dir():
     sys = platform.system()
@@ -14,8 +24,11 @@ def get_PassCore_dir():
         return Path(os.getenv("APPDATA")) / "PassCore"
     else:
         raise RuntimeError(f"Unsupported OS: {sys}")
-    
+
+CONTAINER_DIR = get_container_dir()
 PASSCORE_DIR = get_PassCore_dir()
+
+CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
 PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
 SALT_FILE = PASSCORE_DIR / "vault.salt"
 META_FILE = PASSCORE_DIR / "meta.json"
@@ -30,9 +43,10 @@ def create_backup():
     with zipfile.ZipFile(zip_dir, "w", compression=zipfile.ZIP_DEFLATED) as backto_zip: # writes splitted blobs into zipfile for backup
         backto_zip.write(SALT_FILE, arcname=SALT_FILE.name)
         backto_zip.write(META_FILE, arcname=META_FILE.name)
-        for blob in PASSCORE_DIR.iterdir():
-            if blob.match("blob_*.bin"):
-                backto_zip.write(blob, arcname=blob.name)
+
+        for file in CONTAINER_DIR.rglob("*"):
+            if file.is_file():
+                backto_zip.write(file, arcname=file.relative_to(CONTAINER_DIR))
     
     MAX_BACKUPS = 10
     all_backups = sorted(backup_root.glob("*.zip"))
@@ -51,14 +65,17 @@ def restore_backup():
         return
     else:
         latest_backups = zip_frompath[0]
+        if CONTAINER_DIR.exists():
+            shutil.rmtree(CONTAINER_DIR)
+        CONTAINER_DIR.mkdir(parents=True, exist_ok=True) # Will create Empty Dir.
         
-        for file in PASSCORE_DIR.iterdir(): # Removes existing corrupted vault from PASSCORE_DIR
-            if (file.match("blob_*.bin")
-                or file.name == SALT_FILE
-                or file.name == META_FILE
-                ):
-                file.unlink()
+        if META_FILE.exists() or SALT_FILE.exists():
+            META_FILE.unlink()
+            SALT_FILE.unlink()
+
         with zipfile.ZipFile(latest_backups, "r") as backfrom_zip:
-            backfrom_zip.extractall(PASSCORE_DIR)
+            backfrom_zip.extractall(CONTAINER_DIR) 
+            shutil.move(CONTAINER_DIR / "meta.json", PASSCORE_DIR)
+            shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
 
     print(f"Recovered from {latest_backups.name}")

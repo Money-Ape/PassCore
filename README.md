@@ -10,69 +10,20 @@ A cryptographic password manager written in Python, focused on secure vault stor
 
 ## Features
 
-* AES-GCM authenticated encryption
-* Argon2id-based key derivation
-* Master password protected vault
-* Random salt generation and persistence
-* Binary vault storage
-* Length-prefixed encrypted record format
-* Vault lock/unlock workflow
-* Save-before-exit protection
-* Automatic vault autosave
-* First-run vault initialization
-* Vault metadata management
-* Blob-based encrypted storage architecture
-* Distributed blob container architecture
-* Metadata-driven blob reconstruction
-* SHA256 blob integrity verification
-* Vault corruption detection
-* Automatic backup creation
-* Backup recovery system
-* Backup retention management
-* GUI-integrated recovery workflow
-* Vault size tracking
-* Vault created/modified tracking
-* XDG-compliant storage layout
-* Cross-platform path abstraction
-* PySide6 graphical user interface
+* AES-GCM encryption with Argon2id key derivation
+* Master-password protected vault with custom authentication dialog
+* Password confirmation, validation, and visibility toggle support
+* Binary vault storage with distributed blob container architecture
+* Metadata-driven reconstruction and SHA256 integrity verification
+* Vault corruption detection and recovery validation
+* Automatic backups, recovery workflows, and backup retention
+* Vault locking, unlocking, autosave, and save-before-exit protection
+* Vault size tracking and created/modified timestamps
+* Cross-platform storage layouts (Linux & Windows)
+* PySide6 desktop graphical interface
 
 ---
 
-## Current Architecture
-
-```text
-  Master Password
-        ↓
-     Argon2id
-        ↓
-Vault Encryption Key
-        ↓
-     AES-GCM
-        ↓
-Temporary Working Vault
-(passwords.bin)
-        ↓
-   Blob Splitting
-        ↓
- Container Generation
-        ↓
-
-~/.local/share/passcore/
-├── vault.salt
-└── meta.json
-
-~/.local/share/.passcore_db/
-├── a76f1d9a4cd6493d/
-│   └── blob_0000.bin
-├── b371b06d00374fb6/
-│   └── blob_0001.bin
-├── e2e0f4c1dd31483c/
-│   └── blob_0002.bin
-└── ...
-
-        ↓
-Persistent Storage
-```
 ```mermaid
 flowchart LR
 
@@ -113,6 +64,49 @@ After encryption and blob generation, the temporary working vault is automatical
 
 ---
 
+## Password Authentication Workflow
+
+PassCore uses a custom password dialog for vault creation and vault unlocking.
+
+![PassCore UI](assets/PassCoreUI_test02.png)
+
+### First Run
+
+```text
+Create Vault
+      ↓
+Enter Master Password
+      ↓
+Confirm Password
+      ↓
+Password Validation
+      ↓
+Argon2id Key Derivation
+      ↓
+Vault Creation
+```
+
+### Vault Unlock
+
+```text
+Unlock Vault
+      ↓
+Enter Master Password
+      ↓
+Optional Password Visibility Toggle
+      ↓
+Argon2id Key Derivation
+      ↓
+AES-GCM Authentication
+      ↓
+Vault Editor
+```
+
+The password confirmation workflow helps prevent accidental vault creation with mistyped master passwords.
+
+The password visibility toggle allows users to verify their password input before authentication.
+
+---
 # Security Design
 
 ## Key Derivation
@@ -337,9 +331,8 @@ Backup retention automatically removes older backups after the configured limit 
 * Vault initialization metadata
 * Master password authentication
 * Vault locking and unlocking
-* Save vault contents
-* Save-before-close workflow
-* Automatic vault autosave
+* Save-before-close workflow & Automatic vault autosave
+* Password confirmation workflow & visibility toggle
 
 ### Cryptography
 
@@ -379,6 +372,9 @@ Backup retention automatically removes older backups after the configured limit 
 * Lock screen support
 * Backup management menu
 * Backend-integrated GUI
+* Custom password dialog
+* Show/Hide password support
+* Password confirmation workflow
 
 ---
 
@@ -424,6 +420,9 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Backup and recovery
 * [x] Created/modified timestamps
 * [x] PySide6 desktop interface
+* [x] Custom password dialog
+* [x] Password visibility toggle
+* [x] Password confirmation workflow
 * [ ] Password generator
 * [ ] Auto-lock timer
 * [ ] Cross-platform packaging
@@ -447,6 +446,10 @@ Backup retention automatically removes older backups after the configured limit 
 * argon2-cffi
 * PySide6
 
+---
+## Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Storage architecture, integrity verification, backup recovery, and platform layouts.
 ---
 
 ## Installation

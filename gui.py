@@ -1,8 +1,8 @@
 import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame)
-from PySide6.QtGui import QAction, QIcon, QPixmap
+from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox)
+from PySide6.QtGui import QAction, QIcon
 from backup import create_backup, restore_backup, META_FILE
 
 class PassCoreUI(QMainWindow):
@@ -369,6 +369,62 @@ class PassCoreUI(QMainWindow):
 
     def vault_close(self):
         self.close()
+
+class PasswordDialog(QDialog):
+    def __init__(self, title="Unlock Vault", confirm=False):
+        super().__init__()
+        self.confirm = confirm
+        self.setWindowTitle(title)
+        self.password = QLineEdit()
+        self.password.setEchoMode(QLineEdit.EchoMode.Password)
+
+        if self.confirm:
+            self.confirm_password = QLineEdit()
+            self.confirm_password.setEchoMode(QLineEdit.EchoMode.Password)
+
+        self.show_pass = QCheckBox("Show Password")
+        self.unlock_btn = QPushButton("Ok")
+        self.cancel_btn = QPushButton("Cancel")
+
+        self.show_pass.toggled.connect(self.toggle_password)
+        self.unlock_btn.clicked.connect(self.validate_passwd)
+        self.cancel_btn.clicked.connect(self.reject)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("Master Password")) # Master Password Dialog
+        layout.addWidget(self.password) # Password Input
+
+        if self.confirm:
+            layout.addWidget(QLabel("Confirm Password"))
+            layout.addWidget(self.confirm_password)
+            
+        layout.addWidget(self.show_pass) # Checkbox Input
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(self.unlock_btn)
+        btn_layout.addWidget(self.cancel_btn)
+        
+        layout.addLayout(btn_layout)
+        self.setLayout(layout)
+
+    def toggle_password(self, checked):
+        mode = (QLineEdit.EchoMode.Normal
+            if checked
+            else QLineEdit.EchoMode.Password
+        )
+        self.password.setEchoMode(mode)
+        
+        if self.confirm:
+            self.confirm_password.setEchoMode(mode)
+
+    def validate_passwd(self):
+        if self.confirm:
+            if (self.password.text() != self.confirm_password.text()):
+                QMessageBox.warning(
+                    self, "PassCore", "Your Password doesn't match with your vault password...\nDon't play with passwrrd passwrod password*"
+                )
+                return
+        self.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
