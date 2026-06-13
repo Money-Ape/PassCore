@@ -169,6 +169,9 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
 
     if WORKING_BIN.exists():
         blob_info = split_file_bin(WORKING_BIN, chunk_size=32)
+        if not blob_info:
+            raise RuntimeError("No blobs generated.!")
+        return
     
     if META_FILE.exists():
         with open(META_FILE, "r") as meta_js:
@@ -244,6 +247,13 @@ def decrypt_vault(key):
     return vault_lines
 
 def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
+    vault_text = editor.toPlainText().strip()
+    if not vault_text:
+        QMessageBox.information(
+            window, "PassCore", "Empty editor, Nothing to lock.!"
+        )
+        return
+    
     reply = QMessageBox.question(
         window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
     )
@@ -268,7 +278,13 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
 def is_first_run():
     return not META_FILE.exists()
 
-def init_vault(window):
+def has_blobs():
+    with open(META_FILE, "r") as meta_ctn:
+        read_meta = json.load(meta_ctn)
+
+    return len(read_meta.get("blobs", {})) > 0
+
+def init_vault():
     vault_meta = {}
     timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     blob_data = {}
@@ -293,17 +309,14 @@ def vault_exists():
         return False
 
     if not META_FILE.exists():
-        is_first_run()
-
-    with open(META_FILE, "r") as meta_ctn:
-        meta = json.load(meta_ctn)
-        
-    return len(meta["blobs"]) > 0
+        return False
+    
+    return True
 
 def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
     while True:
         if is_first_run():            
-            init_vault(window)
+            init_vault()
             dialog = PasswordDialog(title="Create Vault", confirm=True)
             ok = dialog.exec()
 
@@ -345,6 +358,10 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 window, "PassCore vault", "vault data is missing or corrupted.!"
             )
             return
+        if not has_blobs():
+            QMessageBox.information(
+                window, "PassCore", "Vault is empty.!"
+            )
 
         try:
             try:
@@ -411,6 +428,12 @@ def autosave_vault(window, editor):
     save_vault(window, editor, window.key)
 
 def save_vault(window, editor, key):
+    vault_text = editor.toPlainText().strip()
+    if not vault_text:
+        QMessageBox.information(
+            window, "PassCore", "Empty editor, Nothing to save.!"
+        )
+        return
     new_lines = editor.toPlainText().splitlines()
     create_backup()
     encrypt_vault(new_lines, key)
@@ -425,6 +448,12 @@ def vault_close(window, editor, key):
         window, "PassCore", "Save changes before closing the Vault.?", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
     )
     if reply == QMessageBox.Yes:
+        vault_text = editor.toPlainText().strip()
+        if not vault_text:
+            QMessageBox.information(
+                window, "PassCore", "Empty editor, Nothing to save.!"
+            )
+            return
         new_lines = editor.toPlainText().splitlines()
         encrypt_vault(new_lines, key)
         window.close()
