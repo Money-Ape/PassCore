@@ -73,6 +73,7 @@ Temporary Working Vault
         ↓
 Persistent Storage
 ```
+```mermaid
 flowchart LR
 
 MasterPassword --> Argon2id
@@ -80,6 +81,7 @@ Argon2id --> AESGCM
 AESGCM --> BlobStorage
 BlobStorage --> IntegrityCheck
 IntegrityCheck --> VaultEditor
+```
 ---
 
 ## Vault Unlock Flow
