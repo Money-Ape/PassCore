@@ -1,6 +1,6 @@
 from gui import PassCoreUI
 from backup import create_backup
-import os, struct, json, platform, hashlib, uuid
+import os, struct, json, platform, hashlib, uuid, shutil
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -120,10 +120,10 @@ def merge_blob_bin():
                 dst_bin.write(src_blob.read())
 
 def split_file_bin(file_bin, chunk_size=32):
-    for exist_blob in CONTAINER_DIR.iterdir():
-        if exist_blob.name.startswith("blob_") and exist_blob.suffix == ".bin":
-            print(f"{BLUE}DELETING_existing {exist_blob.name}{RESET}")
-            os.remove(CONTAINER_DIR / exist_blob) # Remove existing blobs to prevent corrupt reconstruction while merging files for decrypt.!
+    for container in CONTAINER_DIR.iterdir():
+        if container.is_dir():
+            print(f"{BLUE}DELETING_existing - {container.name}{RESET}")
+            shutil.rmtree(container) # Remove existing blobs to prevent corrupt reconstruction while merging files for decrypt.!
 
     print(f"\n{GREEN}splitting {file_bin.name}......{RESET}")
     with open(WORKING_BIN, "rb") as src_bin:
@@ -168,15 +168,14 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
             # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
     if WORKING_BIN.exists():
-        split_file_bin(WORKING_BIN, chunk_size=32)
+        blob_info = split_file_bin(WORKING_BIN, chunk_size=32)
     
     if META_FILE.exists():
         with open(META_FILE, "r") as meta_js:
             vault_meta = json.load(meta_js)
     else:
         vault_meta = {}
-    
-    blob_info = split_file_bin(WORKING_BIN, chunk_size=32) 
+     
     timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     blob_data = {}
     total_size = 0
