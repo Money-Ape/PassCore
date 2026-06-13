@@ -22,13 +22,16 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * First-run vault initialization
 * Vault metadata management
 * Blob-based encrypted storage architecture
+* Distributed blob container architecture
+* Metadata-driven blob reconstruction
 * SHA256 blob integrity verification
+* Vault corruption detection
 * Automatic backup creation
 * Backup recovery system
 * Backup retention management
-* Vault corruption detection
 * GUI-integrated recovery workflow
 * Vault size tracking
+* Vault created/modified tracking
 * XDG-compliant storage layout
 * Cross-platform path abstraction
 * PySide6 graphical user interface
@@ -51,26 +54,42 @@ Temporary Working Vault
         ↓
    Blob Splitting
         ↓
+ Container Generation
+        ↓
 
 ~/.local/share/passcore/
 ├── vault.salt
-├── meta.json
-├── blob_0000.bin
-├── blob_0001.bin
+└── meta.json
+
+~/.local/share/.passcore_db/
+├── a76f1d9a4cd6493d/
+│   └── blob_0000.bin
+├── b371b06d00374fb6/
+│   └── blob_0001.bin
+├── e2e0f4c1dd31483c/
+│   └── blob_0002.bin
 └── ...
 
         ↓
 Persistent Storage
 ```
+flowchart LR
 
-### Vault Unlock Flow
+MasterPassword --> Argon2id
+Argon2id --> AESGCM
+AESGCM --> BlobStorage
+BlobStorage --> IntegrityCheck
+IntegrityCheck --> VaultEditor
+---
+
+## Vault Unlock Flow
 
 ```text
-Encrypted Blobs
+Encrypted Containers
         ↓
 meta.json Verification
         ↓
- Verify Blob Count
+ Verify Container
         ↓
 Verify Blob Existence
         ↓
@@ -121,10 +140,11 @@ PassCore uses platform-appropriate storage locations.
 ```text
 ~/.local/share/passcore/
 ├── vault.salt
-├── meta.json
-├── blob_0000.bin
-├── blob_0001.bin
-└── ...
+└── meta.json
+
+~/.local/share/.passcore_db/
+├── container_id/
+│   └── blob_*.bin
 
 ~/.cache/passcore/
 └── passwords.bin (temporary)
@@ -135,10 +155,11 @@ PassCore uses platform-appropriate storage locations.
 ```text
 %APPDATA%\PassCore\
 ├── vault.salt
-├── meta.json
-├── blob_0000.bin
-├── blob_0001.bin
-└── ...
+└── meta.json
+
+%LOCALAPPDATA%\PassCoreData\
+├── container_id\
+│   └── blob_*.bin
 
 %LOCALAPPDATA%\PassCore\Cache\
 └── passwords.bin (temporary)
@@ -148,33 +169,54 @@ The temporary working vault is reconstructed only when needed and is automatical
 
 ---
 
-## Blob Architecture
+## Distributed Blob Storage
 
-Encrypted vault data is split into multiple binary blobs after encryption.
+PassCore stores encrypted vault chunks inside randomized container directories.
 
-```text
-  Encrypted Vault
-        ↓
-      Split
-        ↓
-   Blob Storage
-```
+Each blob receives a unique container identifier during encryption.
 
-During unlock:
+Example:
 
 ```text
-   Blob Storage
-        ↓
-Verify Integrity
-        ↓
-     Rebuild
-        ↓
-  Encrypted Vault
-        ↓
-     Decrypt
+.passcore_db/
+
+├── a76f1d9a4cd6493d/
+│   └── blob_0000.bin
+
+├── b371b06d00374fb6/
+│   └── blob_0001.bin
+
+├── e2e0f4c1dd31483c/
+│   └── blob_0002.bin
 ```
 
-The blob architecture is intended to reduce direct exposure of vault storage and provide a foundation for future distributed storage strategies.
+Container identifiers are recorded inside metadata and used during integrity verification and vault reconstruction.
+
+Example metadata entry:
+
+```json
+{
+    "blob_0000.bin": {
+        "container": "a76f1d9a4cd6493d",
+        "size": 32,
+        "sha256": "..."
+    }
+}
+```
+
+This architecture separates:
+
+```text
+Storage Layer
+        ↓
+Metadata Layer
+        ↓
+Integrity Layer
+        ↓
+Recovery Layer
+```
+
+and provides a foundation for future distributed storage strategies.
 
 ---
 
@@ -184,7 +226,7 @@ Before vault reconstruction, PassCore validates stored blobs using metadata reco
 
 Verification includes:
 
-* Blob count verification
+* Container verification
 * Blob existence verification
 * Blob size verification
 * SHA256 hash verification
@@ -194,7 +236,7 @@ Verification flow:
 ```text
     meta.json
         ↓
- Verify Blob Count
+ Verify Container
         ↓
 Verify Blob Existence
         ↓
@@ -231,7 +273,7 @@ Backups contain:
 
 * vault.salt
 * meta.json
-* All encrypted vault blobs
+* All encrypted blob containers
 
 Backups are stored separately from vault storage.
 
@@ -247,7 +289,6 @@ Backups are stored separately from vault storage.
 Documents\PassCore Backups\
 ```
 
----
 ### Backup Workflow
 
 ```text
@@ -265,9 +306,9 @@ Keep Latest N Backups
 ```text
   Restore Backup
         ↓
-  Extract Backup
+ Extract Containers
         ↓
-  Restore Blobs
+ Restore Metadata
         ↓
 Integrity Verification
         ↓
@@ -277,6 +318,7 @@ Integrity Verification
 PassCore can recover from:
 
 * Missing blobs
+* Missing containers
 * Corrupted blobs
 * Accidental vault deletion
 * Failed vault modifications
@@ -307,6 +349,8 @@ Backup retention automatically removes older backups after the configured limit 
 
 * Blob generation
 * Blob reconstruction
+* Distributed blob container storage
+* Metadata-driven reconstruction
 * Temporary vault cleanup
 * Automatic backup creation
 * Backup recovery
@@ -317,7 +361,7 @@ Backup retention automatically removes older backups after the configured limit 
 ### Integrity Verification
 
 * Corruption detection
-* Blob count verification
+* Container verification
 * Blob existence verification
 * Blob size verification
 * SHA256 blob integrity verification
@@ -329,6 +373,7 @@ Backup retention automatically removes older backups after the configured limit 
 * Vault corruption indicators
 * Save tracking
 * Vault size tracking
+* Created/modified timestamps
 * Lock screen support
 * Backup management menu
 * Backend-integrated GUI
@@ -339,7 +384,6 @@ Backup retention automatically removes older backups after the configured limit 
 
 ### Storage
 
-* Distributed blob locations
 * Vault export/import
 
 ### Security
@@ -367,6 +411,7 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Vault lock/unlock workflow
 * [x] First-run initialization
 * [x] Blob storage architecture
+* [x] Distributed blob storage
 * [x] Blob reconstruction
 * [x] Save-before-exit protection
 * [x] Autosave workflow
@@ -375,8 +420,8 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Temporary vault cleanup
 * [x] Blob integrity verification
 * [x] Backup and recovery
+* [x] Created/modified timestamps
 * [x] PySide6 desktop interface
-* [ ] Distributed blob storage
 * [ ] Password generator
 * [ ] Auto-lock timer
 * [ ] Cross-platform packaging
@@ -399,6 +444,7 @@ Backup retention automatically removes older backups after the configured limit 
 * cryptography
 * argon2-cffi
 * PySide6
+
 ---
 
 ## Installation
