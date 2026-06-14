@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
-from PySide6.QtWidgets import(QApplication, QInputDialog, QLineEdit, QMessageBox)
+from PySide6.QtWidgets import(QApplication, QMessageBox)
 from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
 

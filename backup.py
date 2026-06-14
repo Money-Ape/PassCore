@@ -1,4 +1,4 @@
-import os, zipfile, platform, json, shutil
+import os, zipfile, platform, shutil
 from datetime import datetime
 from pathlib import Path
 
