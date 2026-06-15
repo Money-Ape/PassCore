@@ -151,6 +151,12 @@ def split_file_bin(file_bin, chunk_size=32):
         
         return blob_info
 
+def pass_gen():
+    pass
+
+def time_sync_htcl():
+    pass
+
 def encrypt_vault(new_lines, key): # Encrypt raw bytes
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
 
