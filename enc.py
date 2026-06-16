@@ -1,4 +1,4 @@
-from gui import PassCoreUI, PasswordDialog
+from gui import PassCoreUI, PasswordDialog, PasswordGenerator
 from backup import create_backup
 import os, struct, json, platform, hashlib, uuid, shutil
 from pathlib import Path
@@ -147,9 +147,6 @@ def split_file_bin(file_bin, chunk_size=32):
 
         return blob_info
 
-def pass_gen():
-    pass
-
 def time_sync_htcl():
     pass
 
@@ -218,7 +215,7 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
         if path.exists():
             shutil.rmtree(path)
             print(f"{BLUE}DELETING_existing - {path.name}{RESET}")
-            
+
     print(f"removed : {WORKING_BIN}...")
     os.remove(WORKING_BIN)
 
@@ -389,10 +386,6 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             window.close()
             return
         masterpasswd = dialog.password.text()
-        
-        if not ok:
-            window.close()
-            return
         
         # key for unlock and authenticate vault blobs
         key = hash_secret_raw(

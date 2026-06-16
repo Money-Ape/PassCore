@@ -1,9 +1,10 @@
 import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox)
 from PySide6.QtGui import QAction, QIcon
 from backup import create_backup, restore_backup, META_FILE
+from passgen import generate_password
 
 class PassCoreUI(QMainWindow):
     def __init__(self):
@@ -103,8 +104,10 @@ class PassCoreUI(QMainWindow):
         backup_folder_action.triggered.connect(self.open_backup_folder)
         view_menu.addAction(backup_folder_action)
         
-        menu.addMenu("Help")
-
+        tools_menu = menu.addMenu("Tools")
+        pass_gen_action = QAction("Password Generator", self)
+        pass_gen_action.triggered.connect(self.open_passwd_gen)
+        tools_menu.addAction(pass_gen_action)
 
         # Central Widget
         central = QWidget()
@@ -295,6 +298,13 @@ class PassCoreUI(QMainWindow):
 
         root_layout.addWidget(sidebar)
 
+    def open_passwd_gen(self, editor):
+        dialog = PasswordGenerator()
+
+        if dialog.exec():
+            password = dialog.output.text()
+            self.editor.insertPlainText(password)
+
     def create_backup_now(self):
         create_backup()
         self.update_vault_size()
@@ -425,6 +435,67 @@ class PasswordDialog(QDialog):
                 )
                 return
         self.accept()
+
+class PasswordGenerator(QDialog):
+
+    def __init__(self, title="PassCore Password Generator"):
+        super().__init__()
+        self.setWindowTitle(title)
+        self.lenght_spin = QSpinBox()
+        self.lenght_spin.setRange(8, 128)
+        self.lenght_spin.setValue(19)
+
+        self.upper_ch = QCheckBox("Uppercase")
+        self.lower_ch = QCheckBox("Lowercase")
+        self.digits_ch = QCheckBox("Numbers")
+        self.symbols_ch = QCheckBox("Symbols")
+        
+        self.upper_ch.setChecked(True)
+        self.lower_ch.setChecked(True)
+        self.digits_ch.setChecked(True)
+        self.symbols_ch.setChecked(True)
+
+        self.output = QLineEdit()
+        self.output.setReadOnly(True)
+
+        self.generate_btn = QPushButton("Generate") # Buttons
+        self.insert_btn = QPushButton("Insert")
+        self.cancel_btn = QPushButton("Cancel")
+
+        self.generate_btn.clicked.connect(self.generate_passwd) # Connections
+        self.insert_btn.clicked.connect(self.accept)
+        self.cancel_btn.clicked.connect(self.reject)
+
+        layout = QVBoxLayout() # Vertical layout for User Actions
+        layout.addWidget(QLabel("Password Length"))
+
+        layout.addWidget(self.lenght_spin)
+        layout.addWidget(self.upper_ch)
+        layout.addWidget(self.lower_ch)
+        layout.addWidget(self.digits_ch)
+        layout.addWidget(self.symbols_ch)
+
+        layout.addWidget(QLabel("Generate Password"))
+        layout.addWidget(self.output)
+
+        btn_layout = QHBoxLayout() # Horizontal layout for User Actions
+        btn_layout.addWidget(self.generate_btn)
+        btn_layout.addWidget(self.insert_btn)
+        btn_layout.addWidget(self.cancel_btn)
+        layout.addLayout(btn_layout)
+
+        self.setLayout(layout)
+        self.generate_passwd()
+
+    def generate_passwd(self):
+        password = generate_password(
+            length=self.lenght_spin.value(),
+            upper=self.upper_ch.isChecked(),
+            lower=self.lower_ch.isChecked(),
+            digits=self.digits_ch.isChecked(),
+            symbols=self.symbols_ch.isChecked(),
+        )
+        self.output.setText(password)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
