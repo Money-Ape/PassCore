@@ -68,23 +68,23 @@ Users may specify the desired password length.
 
 ---
 
-### Character Sets
+## Character Sets
 
 The following character groups can be enabled or disabled:
 
-#### Uppercase
+### Uppercase
 ![Password Generator Demo](assets/Password_Generator_win-upper.gif)
 
 
-#### Lowercase
+### Lowercase
 ![Password Generator Demo](assets/Password_Generator_win-lower.gif)
 
 
-#### Numbers
+### Numbers
 ![Password Generator Demo](assets/Password_Generator_win-digits.gif)
 
 
-#### Symbols
+### Symbols
 ![Password Generator Demo](assets/Password_Generator_win-symbols.gif)
 
 
