@@ -1,4 +1,4 @@
-## PassCore Architecture
+# PassCore Architecture
 
 ```mermaid
 flowchart TD
@@ -11,15 +11,15 @@ MP["Master Password"]
 A["Argon2id Key Derivation"]
 K["Vault Encryption Key"]
 E["AES-GCM Encryption"]
-W["Temporary Working Vault<br/>passwords.bin"]
+RAM1["Encrypted Bytes (RAM)"]
 B["Blob Splitting"]
 C["Container Generation"]
 
 MP --> A
 A --> K
 K --> E
-E --> W
-W --> B
+E --> RAM1
+RAM1 --> B
 B --> C
 
 %% ==========================================================
@@ -65,11 +65,13 @@ VS --> VH
 %% ==========================================================
 
 BR["Blob Reconstruction"]
+RAM2["Encrypted Bytes (RAM)"]
 DEC["AES-GCM Decryption"]
 EDITOR["Vault Editor"]
 
 VH --> BR
-BR --> DEC
+BR --> RAM2
+RAM2 --> DEC
 DEC --> EDITOR
 
 %% ==========================================================
@@ -115,7 +117,37 @@ end
 
 ---
 
-## Linux Storage Layout
+# In-Memory Vault Processing
+
+PassCore reconstructs encrypted vault data directly in memory.
+
+```text
+Encrypted Containers
+        ↓
+Integrity Verification
+        ↓
+Blob Reconstruction
+        ↓
+Encrypted Bytes (RAM)
+        ↓
+AES-GCM Decryption
+        ↓
+   Vault Editor
+        ↓
+AES-GCM Encryption
+        ↓
+Encrypted Bytes (RAM)
+        ↓
+  Blob Splitting
+        ↓
+Encrypted Containers
+```
+
+No temporary vault files are created during normal operation.
+
+---
+
+# Linux Storage Layout
 
 ```text
 ~/.local/share/passcore/
@@ -125,14 +157,11 @@ end
 ~/.local/share/.passcore_db/
 ├── container_id/
 │   └── blob_*.bin
-
-~/.cache/passcore/
-└── passwords.bin (temporary)
 ```
 
 ---
 
-## Windows Storage Layout
+# Windows Storage Layout
 
 ```text
 %APPDATA%\PassCore\
@@ -142,14 +171,35 @@ end
 %LOCALAPPDATA%\PassCoreData\
 ├── container_id\
 │   └── blob_*.bin
-
-%LOCALAPPDATA%\PassCore\Cache\
-└── passwords.bin (temporary)
 ```
 
 ---
 
-## Recovery Flow
+# Integrity Verification Flow
+
+```text
+    meta.json
+        ↓
+ Verify Metadata
+        ↓
+ Verify Container
+        ↓
+Verify Blob Existence
+        ↓
+  Verify Blob Size
+        ↓
+  Verify SHA256
+        ↓
+Blob Reconstruction
+        ↓
+AES-GCM Decryption
+        ↓
+   Vault Unlock
+```
+
+---
+
+# Recovery Flow
 
 ```text
 Restore Backup
@@ -162,5 +212,23 @@ Restore Containers
       ↓
 Integrity Verification
       ↓
-Vault Unlock
+ Vault Unlock
 ```
+
+---
+
+# Storage Architecture Overview
+
+```text
+Storage Layer
+      ↓
+Metadata Layer
+      ↓
+Integrity Layer
+      ↓
+Recovery Layer
+```
+
+PassCore stores encrypted vault data inside distributed container directories. Metadata tracks container mappings, blob sizes, and SHA256 integrity hashes. Before reconstruction, all blobs are validated against recorded metadata to detect corruption or tampering.
+
+Vault data is reconstructed directly in memory and decrypted only after successful integrity verification. This architecture avoids temporary vault files and reduces the risk of residual vault data remaining on disk after crashes or unexpected termination.

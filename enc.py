@@ -56,7 +56,6 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 SALT_FILE = PASSCORE_DIR / "vault.salt"
 META_FILE = PASSCORE_DIR / "meta.json"
 CONFIG_FILE =  PASSCORE_DIR / "config.json"
-WORKING_BIN = CACHE_DIR / "passwords.bin"
 
 if not SALT_FILE.exists():
     salt = os.urandom(16)
@@ -108,44 +107,43 @@ def merge_blob_bin():
     with open(META_FILE, "r") as meta_ctn:
         meta = json.load(meta_ctn)
     
-    with open(WORKING_BIN, "wb") as dst_bin:
-        for blob_name in sorted(meta["blobs"]):
-            container_id = meta["blobs"][blob_name]["container"] 
-            blob_path = CONTAINER_DIR / container_id / blob_name
-            
-            if not blob_path.exists():
-                raise FileNotFoundError(f"Missing blob {blob_name}")
+    merge_data = bytearray()
+    for blob_name in sorted(meta["blobs"]):
+        container_id = meta["blobs"][blob_name]["container"] 
+        blob_path = CONTAINER_DIR / container_id / blob_name
+        
+        if not blob_path.exists():
+            raise FileNotFoundError(f"Missing blob {blob_name}")
 
-            with open(blob_path, "rb") as src_blob: # Merge all the blobs exists in PASSCORE_DIR to generate bin cache for after use in Decryption.!
-                dst_bin.write(src_blob.read())
+        with open(blob_path, "rb") as src_blob: # Merge all the blobs exists in PASSCORE_DIR to generate bin cache for after use in Decryption.!
+            merge_data.extend(src_blob.read())
+    
+    return bytes(merge_data)
 
-def split_file_bin(file_bin, chunk_size=32):
+def split_file_bin(encrypted_data, chunk_size=32):
+    blob_info = {}
+    index = 0
+    
+    for offset in range(0, len(encrypted_data), chunk_size):
+        chunk = encrypted_data[offset : offset + chunk_size]
+        if not chunk:
+            break
+        
+        container_id = uuid.uuid4().hex[:16]
+        container_path = CONTAINER_DIR / container_id
+        container_path.mkdir(parents=True, exist_ok=True)
+        
+        path = (container_path / f"blob_{index:04d}.bin").resolve()
+        print(f"{path.name} Chunk Size: {len(chunk)} bytes")
+        with open(path, "wb") as blob_dst: # write data for splitting bin data to blobs 
+            blob_dst.write(chunk)
+        
+        blob_info[path.name] = {
+            "container": container_id
+        }
+        index += 1
 
-    print(f"\n{GREEN}splitting {file_bin.name}......{RESET}")
-    with open(WORKING_BIN, "rb") as src_bin:
-        index = 0
-
-        blob_info = {}
-        while True:
-            chunk = src_bin.read(chunk_size)
-            if not chunk:
-                break
-            
-            container_id = uuid.uuid4().hex[:16]
-            container_path = CONTAINER_DIR / container_id
-            container_path.mkdir(parents=True, exist_ok=True)
-            
-            path = (container_path / f"blob_{index:04d}.bin").resolve()
-            print(f"{path.name} Chunk Size: {len(chunk)} bytes")
-            with open(path, "wb") as blob_dst: # write data for splitting bin data to blobs 
-                blob_dst.write(chunk)
-            
-            blob_info[path.name] = {
-                "container": container_id
-            }
-            index += 1
-
-        return blob_info
+    return blob_info
 
 def time_sync_htcl():
     pass
@@ -153,23 +151,22 @@ def time_sync_htcl():
 def encrypt_vault(new_lines, key): # Encrypt raw bytes
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
 
-    with open(WORKING_BIN, "wb") as encrypt_bin:
-        for i, line in enumerate(new_lines):
-            line = line.strip()
+    encrypted_data = bytearray()
+    for i, line in enumerate(new_lines):
+        line = line.strip()
 
-            nonce = os.urandom(12)
-            encrypt_enc_d = enc_cipher.encrypt(nonce, line.encode(), None) # Encrypt string to bytes
-            record_enc_d = nonce + encrypt_enc_d
-            length = len(record_enc_d)
+        nonce = os.urandom(12)
+        encrypt_enc_d = enc_cipher.encrypt(nonce, line.encode(), None) # Encrypt string to bytes
+        record_enc_d = nonce + encrypt_enc_d
+        length = len(record_enc_d)
 
-            encrypt_bin.write(struct.pack(">I", length)) # store encrypted raw bytes length
-            encrypt_bin.write(record_enc_d) # store encrypted raw bytes record with nonce
-            # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
+        encrypted_data.extend(struct.pack(">I", length)) # store encrypted raw bytes length
+        encrypted_data.extend(record_enc_d) # store encrypted raw bytes record with nonce
+        # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
-    if WORKING_BIN.exists():
-        blob_info = split_file_bin(WORKING_BIN, chunk_size=32)
-        if not blob_info:
-            raise RuntimeError("No blobs generated.!")
+    blob_info = split_file_bin(bytes(encrypted_data), chunk_size=32)
+    if not blob_info:
+        raise RuntimeError("No blobs generated.!")
      
     timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     blob_data = {}
@@ -186,7 +183,7 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
             }
             total_size += size
     print("================================================")
-    print(f"Working bin: {WORKING_BIN.stat().st_size} bytes")
+    print(f"Working bin: {len(encrypted_data)} bytes")
     print(f"Total blob size: {total_size} bytes")
     print("================================================")
     
@@ -214,35 +211,25 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
         path  = CONTAINER_DIR / ctn
         if path.exists():
             shutil.rmtree(path)
-            print(f"{BLUE}DELETING_existing - {path.name}{RESET}")
+            print(f"{GREEN}REMOVED_EXISTING - {path.name}{RESET}")
 
-    print(f"removed : {WORKING_BIN}...")
-    os.remove(WORKING_BIN)
-
-def decrypt_vault(key):
+def decrypt_vault(key, encrypted_blobs):
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
     vault_lines = []
-    file_bin = WORKING_BIN
     try:
-        if not WORKING_BIN.exists():
-            print(f"{RED}Vault exists but salt-key or passwords blob is missing.\nThe vault cannot be decrypted.!{RESET}")
-            QMessageBox.information(None, "PassCore", "No vault found.!\nCreating a new vault.!")
-            return []
+        offset = 0
+        while offset < len(encrypted_blobs):
+            read_len_data = encrypted_blobs[offset : offset + 4] # Read 4 byte length
+            offset += 4
+            if not read_len_data:
+                break
 
-        else:
-            print(f"{GREEN}File in working directory: {RESET}",file_bin.name.capitalize(), "\n")
-
-            with open(file_bin, "rb") as decrypt_bin:
-                while True:
-                    read_len_data = decrypt_bin.read(4) # Read 4 byte length
-                    if not read_len_data:
-                        break
-
-                    length = struct.unpack(">I", read_len_data)[0] # Unpack lenght integer bytes
-                    record_enc_d = decrypt_bin.read(length) # Read full byte record
-                    nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
-                    decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
-                    vault_lines.append(decrypt_enc_d.decode())
+            length = struct.unpack(">I", read_len_data)[0] # Unpack lenght integer bytes
+            record_enc_d = encrypted_blobs[offset : offset + length] # Read full byte record
+            offset += length
+            nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
+            decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
+            vault_lines.append(decrypt_enc_d.decode())
                 
     except FileNotFoundError as e1:
         print(f"{RED}Error: {RESET}", e1)
@@ -261,8 +248,6 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
         window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
     )
     if reply == QMessageBox.Yes:
-        if WORKING_BIN.exists():
-            os.remove(WORKING_BIN)
         editor.setPlainText(window.lock_screen)
         editor.setReadOnly(True)
         window.status_label.setText("Locked")
@@ -270,10 +255,11 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
         lock_btn.setEnabled(False)
         save_btn.setEnabled(False)
         unlock_btn.setEnabled(True)
-        QMessageBox.information(window, "PassCore", "Vault Locked.!")
 
         unlock_btn.show()
-        window.key = None 
+        window.key = None
+        autolock_timer = QTimer()
+        autolock_timer.stop()
         
     elif reply == QMessageBox.No:
         return
@@ -349,6 +335,8 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             save_btn.setEnabled(True)
             lock_btn.setEnabled(True)
 
+            autolock_timer = QTimer()
+            autolock_timer.start(300000)
             QMessageBox.information(
                 window, "PassCore", "Create your first vault"
             )
@@ -371,7 +359,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 window.vault_corrupted()
                 QMessageBox.information(window, "PassCore", str(e))
                 return
-            merge_blob_bin()
+            encrypted_blobs = merge_blob_bin()
 
         except FileNotFoundError:
             QMessageBox.information(
@@ -399,7 +387,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         ) 
         window.key = key
         try:
-            vault_lines = decrypt_vault(key)
+            vault_lines = decrypt_vault(key, encrypted_blobs)
             
             unlock_btn.hide()
             
@@ -413,16 +401,29 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
 
             save_btn.setEnabled(True)
             lock_btn.setEnabled(True)
+
+            autolock_timer = QTimer()
+            autolock_timer.start(300000)
             return
         
         except InvalidTag:
             QMessageBox.information(window, "PassCore", "wrong master password.!")
 
 def autosave_vault(window, editor):
+    vault_text = editor.toPlainText().strip()
+    if not vault_text:
+        return
+    
     if window.key is None:
         return
     
     save_vault(window, editor, window.key)
+
+def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn):
+    if window.key is None:
+        return
+    
+    vault_lock(window, editor, save_btn, unlock_btn, lock_btn)
 
 def save_vault(window, editor, key):
     vault_text = editor.toPlainText().strip()
@@ -457,9 +458,6 @@ def vault_close(window, editor, key):
         print(f"{YELLOW}bye.!{RESET}")
     
     elif reply == QMessageBox.No:
-        if WORKING_BIN.exists():
-            os.remove(WORKING_BIN)
-
         window.close()
         print(f"{YELLOW}bye.!{RESET}")
     
@@ -489,6 +487,15 @@ def user_edit():
         lambda: autosave_vault(window, editor) # triggers autosave_vault() when key is None
     )
     
+    autolock_timer = QTimer() # Auto lock timer
+    autolock_timer.setSingleShot(True)
+    editor.textChanged.connect(
+        lambda: autolock_timer.start(300000)
+    )
+    autolock_timer.timeout.connect(
+        lambda: autolock_vault(window, editor, save_btn, unlock_btn, lock_btn)
+    )
+
     unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
     
     save_btn.clicked.connect(

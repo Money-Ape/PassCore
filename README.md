@@ -4,7 +4,7 @@
 
 A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
 
-> **Project Status:** Alpha Pre-release (v0.2.0-alpha)
+> **Project Status:** Alpha Pre-release (v0.3.0-alpha)
 
 ---
 
@@ -17,10 +17,11 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * Metadata-driven reconstruction and SHA256 integrity verification
 * Vault corruption detection and recovery validation
 * Automatic backups, recovery workflows, and backup retention
-* Vault locking, unlocking, autosave, and save-before-exit protection
+* Vault locking, unlocking, autosave, inactivity-based auto-lock, and save-before-exit protection
 * Vault size tracking and created/modified timestamps
 * Cross-platform storage layouts (Linux & Windows)
 * Built-in cryptographically secure password generator
+* Memory-only vault reconstruction and editing workflow
 * PySide6 desktop graphical interface
 ---
 
@@ -29,9 +30,10 @@ flowchart LR
 
 MasterPassword --> Argon2id
 Argon2id --> AESGCM
-AESGCM --> BlobStorage
-BlobStorage --> IntegrityCheck
-IntegrityCheck --> VaultEditor
+AESGCM --> DistributedContainers
+DistributedContainers --> IntegrityVerification
+IntegrityVerification --> MemoryReconstruction
+MemoryReconstruction --> VaultEditor
 ```
 ---
 
@@ -52,16 +54,14 @@ Verify Blob Existence
         ↓
 Blob Reconstruction
         ↓
-Temporary Working Vault
-(passwords.bin)
+Encrypted Vault Data (Memory)
         ↓
 AES-GCM Decryption
         ↓
    Vault Editor
 ```
 
-After encryption and blob generation, the temporary working vault is automatically removed from cache storage.
-
+PassCore reconstructs encrypted vault data directly in memory during unlock operations and does not create temporary vault files on disk.
 ---
 
 ## Password Authentication Workflow
@@ -127,7 +127,6 @@ Tools
 
 ---
 # Security Design
-
 ## Key Derivation
 
 PassCore derives vault encryption keys from a master password using Argon2id.
@@ -160,9 +159,6 @@ PassCore uses platform-appropriate storage locations.
 ~/.local/share/.passcore_db/
 ├── container_id/
 │   └── blob_*.bin
-
-~/.cache/passcore/
-└── passwords.bin (temporary)
 ```
 
 ### Windows
@@ -175,13 +171,9 @@ PassCore uses platform-appropriate storage locations.
 %LOCALAPPDATA%\PassCoreData\
 ├── container_id\
 │   └── blob_*.bin
-
-%LOCALAPPDATA%\PassCore\Cache\
-└── passwords.bin (temporary)
 ```
 
-The temporary working vault is reconstructed only when needed and is automatically removed after encryption and blob generation.
-
+PassCore reconstructs encrypted vault data directly in memory during unlock operations. No temporary vault files are written to disk during normal editing, encryption, or decryption workflows.
 ---
 
 ## Distributed Blob Storage
@@ -222,13 +214,13 @@ Example metadata entry:
 This architecture separates:
 
 ```text
-Storage Layer
+  Storage Layer
         ↓
-Metadata Layer
+ Metadata Layer
         ↓
-Integrity Layer
+ Integrity Layer
         ↓
-Recovery Layer
+  Recovery Layer
 ```
 
 and provides a foundation for future distributed storage strategies.
@@ -349,7 +341,7 @@ Backup retention automatically removes older backups after the configured limit 
 * Vault creation
 * Vault initialization metadata
 * Master password authentication
-* Vault locking and unlocking
+* Vault locking/autolocking after inactivity and unlocking
 * Save-before-close workflow & Automatic vault autosave
 * Password confirmation workflow & visibility toggle
 * Integrated password generator
@@ -366,7 +358,8 @@ Backup retention automatically removes older backups after the configured limit 
 * Blob reconstruction
 * Distributed blob container storage
 * Metadata-driven reconstruction
-* Temporary vault cleanup
+* In-memory vault reconstruction
+* In-memory vault encryption/decryption workflow
 * Automatic backup creation
 * Backup recovery
 * Backup retention management
@@ -398,6 +391,7 @@ Backup retention automatically removes older backups after the configured limit 
 * Password Generator dialog
 * Tools menu integration
 * Direct password insertion into editor
+* Automatic vault locking after inactivity
 
 ---
 
@@ -410,14 +404,12 @@ Backup retention automatically removes older backups after the configured limit 
 ### Security
 
 * Secure overwrite before file deletion
-* Optional memory-only reconstruction
 * Vault health diagnostics
 
 ### User Experience
 
 * Search records
 * Record categories
-* Auto-lock timer
 * Cross-platform packaging
 
 ---
@@ -437,7 +429,6 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Autosave workflow
 * [x] XDG storage layout
 * [x] Windows storage layout
-* [x] Temporary vault cleanup
 * [x] Blob integrity verification
 * [x] Backup and recovery
 * [x] Created/modified timestamps
@@ -446,7 +437,8 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Password visibility toggle
 * [x] Password confirmation workflow
 * [x] Password generator
-* [ ] Auto-lock timer
+* [x] Auto-lock timer
+* [x] Memory-only vault processing
 * [ ] Cross-platform packaging
 
 ---
