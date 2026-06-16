@@ -120,10 +120,6 @@ def merge_blob_bin():
                 dst_bin.write(src_blob.read())
 
 def split_file_bin(file_bin, chunk_size=32):
-    for container in CONTAINER_DIR.iterdir():
-        if container.is_dir():
-            print(f"{BLUE}DELETING_existing - {container.name}{RESET}")
-            shutil.rmtree(container) # Remove existing blobs to prevent corrupt reconstruction while merging files for decrypt.!
 
     print(f"\n{GREEN}splitting {file_bin.name}......{RESET}")
     with open(WORKING_BIN, "rb") as src_bin:
@@ -148,7 +144,7 @@ def split_file_bin(file_bin, chunk_size=32):
                 "container": container_id
             }
             index += 1
-        
+
         return blob_info
 
 def pass_gen():
@@ -177,13 +173,6 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
         blob_info = split_file_bin(WORKING_BIN, chunk_size=32)
         if not blob_info:
             raise RuntimeError("No blobs generated.!")
-        return
-    
-    if META_FILE.exists():
-        with open(META_FILE, "r") as meta_js:
-            vault_meta = json.load(meta_js)
-    else:
-        vault_meta = {}
      
     timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     blob_data = {}
@@ -206,6 +195,11 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
     
     with open(META_FILE, "r") as old_meta:
         created_at = json.load(old_meta)
+        old_ctn = {
+            info["container"]
+            for info in created_at["blobs"].values()
+        }
+
     vault_meta = {
         "storage_path": str(CONTAINER_DIR),
         "created": created_at["created"],
@@ -219,6 +213,12 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
     
     print("Saved.!\n")
     
+    for ctn in old_ctn:
+        path  = CONTAINER_DIR / ctn
+        if path.exists():
+            shutil.rmtree(path)
+            print(f"{BLUE}DELETING_existing - {path.name}{RESET}")
+            
     print(f"removed : {WORKING_BIN}...")
     os.remove(WORKING_BIN)
 
@@ -308,8 +308,6 @@ def init_vault():
         json.dump(vault_meta, meta_f, indent=4)
 
 def vault_exists():
-    if not PASSCORE_DIR.is_dir():
-        return False
     
     if not SALT_FILE.exists():
         return False
