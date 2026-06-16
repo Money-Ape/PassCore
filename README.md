@@ -20,8 +20,8 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * Vault locking, unlocking, autosave, and save-before-exit protection
 * Vault size tracking and created/modified timestamps
 * Cross-platform storage layouts (Linux & Windows)
+* Built-in cryptographically secure password generator
 * PySide6 desktop graphical interface
-
 ---
 
 ```mermaid
@@ -105,6 +105,25 @@ Vault Editor
 The password confirmation workflow helps prevent accidental vault creation with mistyped master passwords.
 
 The password visibility toggle allows users to verify their password input before authentication.
+
+## Password Generator
+
+PassCore includes an integrated password generator capable of creating cryptographically secure passwords using Python's `secrets` module.
+
+The generator supports:
+
+* Configurable password length
+* Uppercase characters
+* Lowercase characters
+* Numeric characters
+* Symbol characters
+* Direct insertion into the vault editor
+
+Access:
+```text
+Tools
+└── Password Generator
+```
 
 ---
 # Security Design
@@ -333,6 +352,7 @@ Backup retention automatically removes older backups after the configured limit 
 * Vault locking and unlocking
 * Save-before-close workflow & Automatic vault autosave
 * Password confirmation workflow & visibility toggle
+* Integrated password generator
 
 ### Cryptography
 
@@ -375,6 +395,9 @@ Backup retention automatically removes older backups after the configured limit 
 * Custom password dialog
 * Show/Hide password support
 * Password confirmation workflow
+* Password Generator dialog
+* Tools menu integration
+* Direct password insertion into editor
 
 ---
 
@@ -394,7 +417,6 @@ Backup retention automatically removes older backups after the configured limit 
 
 * Search records
 * Record categories
-* Password generator
 * Auto-lock timer
 * Cross-platform packaging
 
@@ -423,7 +445,7 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Custom password dialog
 * [x] Password visibility toggle
 * [x] Password confirmation workflow
-* [ ] Password generator
+* [x] Password generator
 * [ ] Auto-lock timer
 * [ ] Cross-platform packaging
 
@@ -450,6 +472,7 @@ Backup retention automatically removes older backups after the configured limit 
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Storage architecture, integrity verification, backup recovery, and platform layouts.
+- [PASSWORDGEN.md](PASSWORDGEN.md) — Password Generator architecture, workflow, configuration options, and security design.
 ---
 
 ## Installation
