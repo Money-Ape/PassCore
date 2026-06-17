@@ -108,28 +108,3 @@ def vault_health():
         "sha256": sha256_ok,
         "backups": backup_count
     }
-
-def generate_report():
-    report = vault_health()
-
-    return f"""
-        Vault Health Report
-
-        Health Score : {report['score']}/100
-
-        Created      : {report['created']}
-        Modified     : {report['modified']}
-
-        Blob Count   : {report['blob_count']}
-        Vault Size   : {report['total_size']} bytes
-
-        Integrity Checks
-
-        Metadata     : {"PASS" if report['metadata'] else "FAIL"}
-        Containers   : {"PASS" if report['containers'] else "FAIL"}
-        Blobs        : {"PASS" if report['existence'] else "FAIL"}
-        Blob Size    : {"PASS" if report['size'] else "FAIL"}
-        SHA256       : {"PASS" if report['sha256'] else "FAIL"}
-
-        Backups Found: {report['backups']}
-    """

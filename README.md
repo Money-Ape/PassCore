@@ -22,6 +22,7 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * Cross-platform storage layouts (Linux & Windows)
 * Built-in cryptographically secure password generator
 * Memory-only vault reconstruction and editing workflow
+* Integrated vault health diagnostics and integrity reporting
 * PySide6 desktop graphical interface
 ---
 
@@ -126,6 +127,48 @@ Tools
 ```
 
 ---
+## Vault Health Diagnostics
+
+PassCore includes an integrated Vault Health Diagnostics system that provides visibility into vault integrity, storage status, and backup availability.
+
+![Vault Health](assets/PassCoreUI_vault_health.png)
+
+The diagnostics dashboard reports:
+
+* Vault health score
+* Metadata validation status
+* Container verification status
+* Blob existence verification
+* Blob size verification
+* SHA256 integrity verification
+* Backup availability
+* Vault statistics and storage information
+
+Access:
+
+```text
+Tools
+└── Vault Health
+```
+
+### Health Verification Workflow
+```text
+Read Metadata
+      ↓
+Verify Containers
+      ↓
+Verify Blobs
+      ↓
+Verify Blob Sizes
+      ↓
+Verify SHA256
+      ↓
+Check Backups
+      ↓
+Generate Health Report
+```
+---
+
 # Security Design
 ## Key Derivation
 
@@ -377,21 +420,13 @@ Backup retention automatically removes older backups after the configured limit 
 ### User Interface
 
 * PySide6 desktop application
-* Vault status indicators
-* Vault corruption indicators
-* Save tracking
-* Vault size tracking
-* Created/modified timestamps
-* Lock screen support
-* Backup management menu
-* Backend-integrated GUI
-* Custom password dialog
-* Show/Hide password support
-* Password confirmation workflow
-* Password Generator dialog
-* Tools menu integration
-* Direct password insertion into editor
-* Automatic vault locking after inactivity
+* Custom password dialogs with validation and visibility controls
+* Vault status, integrity, size, and timestamp monitoring
+* Autosave, save tracking, lock screen, and inactivity-based auto-lock
+* Backup management and recovery integration
+* Password Generator and Vault Health Diagnostics dashboards
+* Health scoring, integrity verification, and backup reporting
+* Backend-integrated vault editing workflow
 
 ---
 
@@ -404,7 +439,8 @@ Backup retention automatically removes older backups after the configured limit 
 ### Security
 
 * Secure overwrite before file deletion
-* Vault health diagnostics
+* Vault health report export
+* Scheduled integrity scans
 
 ### User Experience
 
@@ -439,6 +475,7 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Password generator
 * [x] Auto-lock timer
 * [x] Memory-only vault processing
+* [x] Vault health diagnostics
 * [ ] Cross-platform packaging
 
 ---

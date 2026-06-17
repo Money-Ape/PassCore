@@ -5,7 +5,7 @@ from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLa
 from PySide6.QtGui import QAction, QIcon
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
-from health import generate_report
+from health import vault_health
 
 class PassCoreUI(QMainWindow):
     def __init__(self):
@@ -304,10 +304,8 @@ class PassCoreUI(QMainWindow):
         root_layout.addWidget(sidebar)
 
     def show_vault_health(self):
-        report = generate_report()
-        QMessageBox.information(
-            self, "Vault Health", report
-        )
+        dialog = VaultHealthDialog()
+        dialog.exec()
 
     def open_passwd_gen(self):
         dialog = PasswordGenerator()
@@ -507,6 +505,183 @@ class PasswordGenerator(QDialog):
             symbols=self.symbols_ch.isChecked(),
         )
         self.output.setText(password)
+
+class VaultHealthDialog(QDialog):
+
+    def __init__(self):
+        super().__init__()
+        report = vault_health()
+        self.setWindowTitle("Vault Health")
+        self.setFixedSize(500, 550)
+
+        score = report["score"]
+
+        if score == 100:
+            health = "🟢 HEALTHY"
+            color = "#4CAF50"
+
+        elif score >= 80:
+            health = "🟡 WARNING"
+            color = "#FBC02D"
+
+        else:
+            health = "🔴 CRITICAL"
+            color = "#E53935"
+
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #FFF8FA;
+            }
+            QFrame {
+                background: #FFFFFF;
+                border: 2px solid #D8B8C4;
+                border-radius: 8px;
+            }
+            QLabel {
+                color: #202020;
+                border: none;
+                background: transparent;
+            }
+            QPushButton {
+                background: #D8B8C4;
+                color: black;
+                border: 2px solid #B88FA0;
+                border-radius: 8px;
+                padding: 6px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #E3C6D1;
+            }
+        """)
+
+        # ==========================================
+        # Health Status
+        status_label = QLabel(health)
+        status_label.setStyleSheet(f"""
+            QLabel {{
+                color: {color};
+                font-size: 20pt;
+                font-weight: bold;
+            }}
+        """)
+
+        score_label = QLabel(
+            f"Score: {score}/100"
+        )
+        score_label.setStyleSheet("""
+            QLabel {
+                font-size: 16pt;
+                font-weight: bold;
+            }
+        """)
+
+        # ==========================================
+        # Vault Information
+        info_frame = QFrame()
+        info_layout = QVBoxLayout()
+
+        info_title = QLabel(
+            "Vault Information"
+        )
+        info_title.setStyleSheet("""
+            QLabel {
+                font-size: 13pt;
+                font-weight: bold;
+                color: #4A4A4A;
+            }
+        """)
+
+        info_label = QLabel(f"""
+            Created : {report['created']}
+            Modified: {report['modified']}
+
+            Blobs   : {report['blob_count']}
+            Size    : {report['total_size']} bytes
+            Backups : {report['backups']}
+            """
+        )
+        info_label.setStyleSheet("""
+            QLabel {
+                font-family: monospace;
+                font-size: 11pt;
+            }
+        """)
+        info_layout.addWidget(info_title)
+        info_layout.addWidget(info_label)
+
+        info_frame.setLayout(info_layout)
+
+        # ==========================================
+        # Integrity Checks
+        checks_frame = QFrame()
+        checks_layout = QVBoxLayout()
+
+        checks_title = QLabel("Integrity Checks")
+        checks_title.setStyleSheet("""
+            QLabel {
+                font-size: 13pt;
+                font-weight: bold;
+                color: #4A4A4A;
+            }
+        """)
+
+        checks_layout.addWidget(checks_title)
+        checks = [
+            ("Metadata", report["metadata"]),
+            ("Containers", report["containers"]),
+            ("Blobs", report["existence"]),
+            ("Blob Size", report["size"]),
+            ("SHA256", report["sha256"])
+        ]
+
+        for name, passed in checks:
+            status = (
+                "✓ PASS"
+                if passed
+                else "✗ FAIL"
+            )
+            color = (
+                "#4CAF50"
+                if passed
+                else "#E53935"
+            )
+            label = QLabel(f"{name:<12} {status}")
+            label.setStyleSheet(f"""
+                QLabel {{
+                    color: {color};
+                    font-size: 11pt;
+                    font-family: monospace;
+                }}
+            """)
+
+            checks_layout.addWidget(label)
+
+        checks_frame.setLayout(checks_layout)
+
+        # ==========================================
+        # Close Button
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+
+        # ==========================================
+        # Main Layout
+        layout = QVBoxLayout()
+
+        layout.addWidget(status_label)
+        layout.addWidget(score_label)
+        layout.addWidget(info_frame)
+        layout.addWidget(checks_frame)
+
+        layout.addStretch()
+        layout.addWidget(close_btn)
+        self.setLayout(layout)
+    
+    def refresh(self):
+        self.close()
+        dialog = VaultHealthDialog()
+        dialog.exec()
+        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
