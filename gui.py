@@ -2,7 +2,7 @@ import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox)
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QIcon, QTextCursor
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
 from health import vault_health
@@ -50,6 +50,8 @@ class PassCoreUI(QMainWindow):
         self.update_vault_size()
         self.vault_text = None
         self.editor.setPlainText(self.lock_screen)
+        self.matches = []
+        self.current_match = 0
 
     def build_ui(self):
 
@@ -91,26 +93,31 @@ class PassCoreUI(QMainWindow):
         menu = self.menuBar()
         menu.addMenu("File")
         
-        edit_menu = menu.addMenu("Edit")
-        create_backup_action = QAction("Create Backup", self)
+        edit_menu = menu.addMenu("Edit") # Edit Menu 
+        create_backup_action = QAction("Create Backup", self) # Edit menu : Create Backup
         create_backup_action.triggered.connect(self.create_backup_now)
         edit_menu.addAction(create_backup_action)
+
+        search_action = QAction("Search", self) # Edit menu : Search Menu
+        search_action.setShortcut("Ctrl+F") # Search Shortcut key
+        search_action.triggered.connect(self.toggle_search)
+        edit_menu.addAction(search_action)
         
-        restore_backup_action = QAction("Restore Backup", self)
+        restore_backup_action = QAction("Restore Backup", self) # Edit menu : Restore Backup
         restore_backup_action.triggered.connect(self.restore_backup_now)
         edit_menu.addAction(restore_backup_action)
         
-        view_menu = menu.addMenu("View")
-        backup_folder_action = QAction("Open Backup Folder", self)
+        view_menu = menu.addMenu("View") # View Menu
+        backup_folder_action = QAction("Open Backup Folder", self) # View menu : Backup folder lookup
         backup_folder_action.triggered.connect(self.open_backup_folder)
         view_menu.addAction(backup_folder_action)
         
-        tools_menu = menu.addMenu("Tools")
-        pass_gen_action = QAction("Password Generator", self)
+        tools_menu = menu.addMenu("Tools") # Tools Menu
+        pass_gen_action = QAction("Password Generator", self) # Tool menu : Password Generator
         pass_gen_action.triggered.connect(self.open_passwd_gen)
         tools_menu.addAction(pass_gen_action)
 
-        vault_health_action = QAction("Vault Health", self)
+        vault_health_action = QAction("Vault Health", self) # Tool menu : Vault health report
         vault_health_action.triggered.connect(self.show_vault_health)
         tools_menu.addAction(vault_health_action)
 
@@ -205,11 +212,98 @@ class PassCoreUI(QMainWindow):
         )
         self.save_label.setStyleSheet(info_style)
 
-        sidebar_layout.addWidget(self.date_label)
-        sidebar_layout.addWidget(self.status_label)
-        sidebar_layout.addWidget(self.size_label)
-        sidebar_layout.addWidget(self.save_label)
+        # ==================================================
+        # Search Rec
+        self.search_input = QLineEdit() # Search Input
+        self.match_label = QLabel("0 / 0") # Match text counts
+        self.match_label.setStyleSheet("""
+            QLabel {
+                background: #FFF8FA;
+                color: #C0392B;
+                border: 2px solid #D8B8C4;
+                border-radius: 8px;
+                padding: 4px;
+                font-weight: bold;
+                font-size: 10pt;
+            }
+        """)
+        
+        self.prev_btn = QPushButton("◀") # Previous jump button
+        self.prev_btn.setFixedWidth(60)
+        self.prev_btn.setStyleSheet("""
+            QPushButton {
+                background: #5D6D7E;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 12pt;
+            }
+            QPushButton:hover {
+                background: #708090;
+            }
+            QPushButton:pressed {
+                background: #4A5568;
+            }
+        """)
+        self.prev_btn.clicked.connect(self.prev_match)
 
+        self.next_btn = QPushButton("▶") # Next jump button
+        self.next_btn.setFixedWidth(60)
+        self.next_btn.setStyleSheet("""
+            QPushButton {
+                background: #5D6D7E;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 12pt;
+            }
+            QPushButton:hover {
+                background: #708090;
+            }
+            QPushButton:pressed {
+                background: #4A5568;
+            }
+        """)
+        self.next_btn.clicked.connect(self.next_match)
+
+        self.search_input.hide()
+        self.match_label.hide()
+        self.prev_btn.hide()
+        self.next_btn.hide()
+
+        self.search_input.setPlaceholderText("Search...")
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background: #F7E6EA;
+                border: 2px solid #D8B8C4;
+                border-radius: 8px;
+                padding: 6px;
+                color: #202020;
+            }
+        """)
+        search_nav_layout = QHBoxLayout()
+        search_nav_layout.addWidget(self.match_label)
+        search_nav_layout.addStretch()
+
+        search_nav_layout.addWidget(self.prev_btn)
+        search_nav_layout.addWidget(self.next_btn)
+
+        self.search_input.returnPressed.connect(self.search_rec)
+
+        # ==================================================
+        # Sidebar layout
+        sidebar_layout.addWidget(self.date_label) # Date label
+        sidebar_layout.addWidget(self.status_label) # Vault Status label
+        sidebar_layout.addWidget(self.size_label) # Size label
+        sidebar_layout.addWidget(self.save_label) # Last-save label
+
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(self.search_input) # Search input to sidebar 
+
+        sidebar_layout.addLayout(search_layout)
+        sidebar_layout.addLayout(search_nav_layout)
         sidebar_layout.addStretch()
 
         # ==================================================
@@ -388,6 +482,84 @@ class PassCoreUI(QMainWindow):
 
     def vault_close(self):
         self.close()
+
+    def toggle_search(self):
+        visible = self.search_input.isVisible()
+
+        self.search_input.setVisible(not visible)
+        self.match_label.setVisible(not visible)
+        self.prev_btn.setVisible(not visible)
+        self.next_btn.setVisible(not visible)
+
+        if not visible:
+            self.search_input.clear()
+            self.match_label.setText("0 / 0")
+            self.search_input.setFocus()
+
+    def search_rec(self):        
+        text = self.search_input.text().strip()
+        if not text:
+            return
+        
+        content = self.editor.toPlainText()
+        self.matches = []
+        start = 0
+        while True:
+            pos = content.lower().find(text.lower(), start)
+            if pos == -1:
+                break
+            
+            self.matches.append(pos)
+            start = pos + len(text)
+            if not self.matches:
+                self.match_label.setText("0 / 0")
+                QMessageBox.information(self, "Search", f"{text} not found.!")
+                return
+            
+            self.current_match = 0
+            self.goto_match()
+            self.match_label.setText(
+                f"{self.current_match + 1}/{len(self.matches)}"
+            )
+
+    def goto_match(self):
+        if not self.matches:
+            return
+        
+        pos = self.matches[self.current_match]
+        cursor = self.editor.textCursor()
+        cursor.setPosition(pos)
+        cursor.movePosition(
+            QTextCursor.MoveOperation.Right,
+            QTextCursor.MoveMode.KeepAnchor,
+            len(self.search_input.text())
+        )
+        self.editor.setTextCursor(cursor)
+        self.editor.setFocus()
+
+    def prev_match(self):
+        if not self.matches:
+            return
+        self.current_match -= 1
+        if self.current_match < 0:
+            self.current_match = len(self.matches) - 1
+
+        self.goto_match()
+        self.match_label.setText(
+            f"{self.current_match + 1}/{len(self.matches)}"
+        )
+
+    def next_match(self):
+        if not self.matches:
+            return
+        self.current_match += 1
+        if self.current_match >= len(self.matches):
+            self.current_match = 0
+        
+        self.goto_match()
+        self.match_label.setText(
+            f"{self.current_match + 1}/{len(self.matches)}"
+        )
 
 class PasswordDialog(QDialog):
     def __init__(self, title="Unlock Vault", confirm=False):

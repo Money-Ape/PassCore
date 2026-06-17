@@ -23,6 +23,7 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * Built-in cryptographically secure password generator
 * Memory-only vault reconstruction and editing workflow
 * Integrated vault health diagnostics and integrity reporting
+* Integrated record search with match navigation and Ctrl+F support
 * PySide6 desktop graphical interface
 ---
 
@@ -150,6 +151,27 @@ Access:
 Tools
 └── Vault Health
 ```
+
+## Search Records
+
+PassCore includes an integrated vault search system for quickly locating records inside the editor.
+
+The search system supports:
+
+* Ctrl+F search shortcut
+* Sidebar-integrated search interface
+* Case-insensitive searching
+* Match highlighting
+* Previous/Next match navigation
+* Match counter display
+
+Access:
+
+```text
+Edit
+└── Search
+```
+---
 
 ### Health Verification Workflow
 ```text
@@ -388,6 +410,7 @@ Backup retention automatically removes older backups after the configured limit 
 * Save-before-close workflow & Automatic vault autosave
 * Password confirmation workflow & visibility toggle
 * Integrated password generator
+* Integrated record search and navigation
 
 ### Cryptography
 
@@ -427,6 +450,7 @@ Backup retention automatically removes older backups after the configured limit 
 * Password Generator and Vault Health Diagnostics dashboards
 * Health scoring, integrity verification, and backup reporting
 * Backend-integrated vault editing workflow
+* Record search dashboard with match navigation
 
 ---
 
@@ -444,8 +468,6 @@ Backup retention automatically removes older backups after the configured limit 
 
 ### User Experience
 
-* Search records
-* Record categories
 * Cross-platform packaging
 
 ---
@@ -476,6 +498,7 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Auto-lock timer
 * [x] Memory-only vault processing
 * [x] Vault health diagnostics
+* [x] Record search and navigation
 * [ ] Cross-platform packaging
 
 ---
