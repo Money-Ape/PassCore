@@ -417,10 +417,18 @@ def autosave_vault(window, editor):
     save_vault(window, editor, window.key)
 
 def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn):
-    if window.key is None:
-        return
-    
-    vault_lock(window, editor, save_btn, unlock_btn, lock_btn)
+    editor.clear()
+    editor.setPlainText(window.lock_screen)
+    editor.setReadOnly(True)
+    window.status_label.setText("Locked")
+
+    lock_btn.setEnabled(False)
+    save_btn.setEnabled(False)
+    unlock_btn.setEnabled(True)
+
+    unlock_btn.show()
+    window.key = None
+    window.autolock_timer.stop()
 
 def save_vault(window, editor, key):
     vault_text = editor.toPlainText().strip()
@@ -484,12 +492,12 @@ def user_edit():
         lambda: autosave_vault(window, editor) # triggers autosave_vault() when key is None
     )
     
-    autolock_timer = QTimer() # Auto lock timer
-    autolock_timer.setSingleShot(True)
+    window.autolock_timer = QTimer() # Auto lock timer
+    window.autolock_timer.setSingleShot(True)
     editor.textChanged.connect(
-        lambda: autolock_timer.start(300000)
+        lambda: window.autolock_timer.start(300000)
     )
-    autolock_timer.timeout.connect(
+    window.autolock_timer.timeout.connect(
         lambda: autolock_vault(window, editor, save_btn, unlock_btn, lock_btn)
     )
 
