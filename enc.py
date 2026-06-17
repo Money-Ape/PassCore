@@ -1,4 +1,4 @@
-from gui import PassCoreUI, PasswordDialog, PasswordGenerator
+from gui import PassCoreUI, PasswordDialog
 from backup import create_backup
 import os, struct, json, platform, hashlib, uuid, shutil
 from pathlib import Path
@@ -144,9 +144,6 @@ def split_file_bin(encrypted_data, chunk_size=32):
         index += 1
 
     return blob_info
-
-def time_sync_htcl():
-    pass
 
 def encrypt_vault(new_lines, key): # Encrypt raw bytes
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption

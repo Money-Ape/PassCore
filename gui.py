@@ -5,6 +5,7 @@ from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLa
 from PySide6.QtGui import QAction, QIcon
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
+from health import generate_report
 
 class PassCoreUI(QMainWindow):
     def __init__(self):
@@ -108,6 +109,10 @@ class PassCoreUI(QMainWindow):
         pass_gen_action = QAction("Password Generator", self)
         pass_gen_action.triggered.connect(self.open_passwd_gen)
         tools_menu.addAction(pass_gen_action)
+
+        vault_health_action = QAction("Vault Health", self)
+        vault_health_action.triggered.connect(self.show_vault_health)
+        tools_menu.addAction(vault_health_action)
 
         # Central Widget
         central = QWidget()
@@ -298,7 +303,13 @@ class PassCoreUI(QMainWindow):
 
         root_layout.addWidget(sidebar)
 
-    def open_passwd_gen(self, editor):
+    def show_vault_health(self):
+        report = generate_report()
+        QMessageBox.information(
+            self, "Vault Health", report
+        )
+
+    def open_passwd_gen(self):
         dialog = PasswordGenerator()
 
         if dialog.exec():

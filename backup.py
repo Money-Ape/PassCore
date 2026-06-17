@@ -33,12 +33,12 @@ PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
 SALT_FILE = PASSCORE_DIR / "vault.salt"
 META_FILE = PASSCORE_DIR / "meta.json"
 
-def create_backup():
-    backup_root = Path.home() / "Documents" / "PassCore Backups" # PassCore Backups root
-    backup_root.mkdir(parents=True, exist_ok=True)
-    
+BACKUP_ROOT = Path.home() / "Documents" / "PassCore Backups" # PassCore Backups root
+BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
+
+def create_backup():    
     timestamp = datetime.now().strftime("%d%m%Y%H%M")
-    zip_dir = backup_root / f"passcore_backup_{timestamp}.zip"
+    zip_dir = BACKUP_ROOT / f"passcore_backup_{timestamp}.zip"
     
     with zipfile.ZipFile(zip_dir, "w", compression=zipfile.ZIP_DEFLATED) as backto_zip: # writes splitted blobs into zipfile for backup
         backto_zip.write(SALT_FILE, arcname=SALT_FILE.name)
@@ -49,7 +49,7 @@ def create_backup():
                 backto_zip.write(file, arcname=file.relative_to(CONTAINER_DIR))
     
     MAX_BACKUPS = 10
-    all_backups = sorted(backup_root.glob("*.zip"))
+    all_backups = sorted(BACKUP_ROOT.glob("*.zip"))
     while len(all_backups) > MAX_BACKUPS:
         old_backup = all_backups.pop(0)
         old_backup.unlink()
