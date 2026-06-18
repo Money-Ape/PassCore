@@ -1,11 +1,12 @@
 import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox, QFileDialog)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox)
 from PySide6.QtGui import QAction, QIcon, QTextCursor
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
 from health import vault_health
+from file import import_txt, import_pcv, export_pcv
 
 class PassCoreUI(QMainWindow):
     def __init__(self):
@@ -93,9 +94,17 @@ class PassCoreUI(QMainWindow):
         # Menu Bar
         menu = self.menuBar()
         file_menu = menu.addMenu("File") # File Menu
-        import_action = QAction("Import", self) # File Menu : Import text files
-        import_action.triggered.connect(self.import_txt)
+        import_action = QAction("Import text", self) # File menu : Import text files
+        import_action.triggered.connect(lambda: import_txt(self))
         file_menu.addAction(import_action)
+
+        import_vault_action = QAction("Import Vault", self)
+        import_vault_action.triggered.connect(lambda: import_pcv(self))
+        file_menu.addAction(import_vault_action)
+
+        export_action = QAction("Export Vault", self) # File menu : Export PassCore Vault
+        export_action.triggered.connect(lambda: export_pcv(self))
+        file_menu.addAction(export_action)
         
         edit_menu = menu.addMenu("Edit") # Edit Menu 
         create_backup_action = QAction("Create Backup", self) # Edit menu : Create Backup
@@ -486,45 +495,6 @@ class PassCoreUI(QMainWindow):
 
     def vault_close(self):
         self.close()
-
-    def import_txt(self):
-        if self.key is None:
-            QMessageBox.information(self, "PassCore", "Unlock the vault before importing...")
-            return
-        
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Import any text File", "", "Text Files (*.txt);;All Files (*)"
-        )
-        if not file_path:
-            return
-        
-        reply = QMessageBox.question(
-            self, "Import Records", "Replace current vault contents.?\n\nYes : Replace\nNo : Add", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
-        )
-        if reply == QMessageBox.Cancel:
-            return
-        
-        try:
-            with open(file_path, "r") as read_imp:
-                imported_txt = read_imp.read()
-            
-            if reply == QMessageBox.Yes:
-                self.editor.setPlainText(imported_txt)
-            
-            else:
-                content_txt = self.editor.toPlainText()
-                if content_txt.strip():
-                    self.editor.setPlainText(
-                        content_txt.rstrip() + "\n" + imported_txt
-                    )
-                else:
-                    self.editor.setPlainText(imported_txt)
-            
-            QMessageBox.information(self, "PassCore", "Records imported successfully.!")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Import Failed", str(e))
-
 
     def toggle_search(self):
         visible = self.search_input.isVisible()
