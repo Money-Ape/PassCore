@@ -290,7 +290,7 @@ class PassCoreUI(QMainWindow):
         search_nav_layout.addWidget(self.prev_btn)
         search_nav_layout.addWidget(self.next_btn)
 
-        self.search_input.returnPressed.connect(self.search_rec)
+        self.search_input.textChanged.connect(self.search_rec)
 
         # ==================================================
         # Sidebar layout
@@ -474,7 +474,7 @@ class PassCoreUI(QMainWindow):
         )
 
     def save_vault(self):
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        timestamp = datetime.now().strftime("%I:%M:%S %p")
         self.save_label.setText(
             f"Last Save\n{timestamp}"
         )
@@ -493,12 +493,17 @@ class PassCoreUI(QMainWindow):
 
         if not visible:
             self.search_input.clear()
+            self.matches = []
+            self.current_match = -1
             self.match_label.setText("0 / 0")
             self.search_input.setFocus()
 
     def search_rec(self):        
         text = self.search_input.text().strip()
         if not text:
+            self.matches = []
+            self.current_match = -1
+            self.match_label.setText("0 / 0")
             return
         
         content = self.editor.toPlainText()
@@ -511,16 +516,18 @@ class PassCoreUI(QMainWindow):
             
             self.matches.append(pos)
             start = pos + len(text)
-            if not self.matches:
-                self.match_label.setText("0 / 0")
-                QMessageBox.information(self, "Search", f"{text} not found.!")
-                return
             
-            self.current_match = 0
-            self.goto_match()
-            self.match_label.setText(
-                f"{self.current_match + 1}/{len(self.matches)}"
-            )
+        if not self.matches:
+            self.prev_btn.setEnabled(False)
+            self.next_btn.setEnabled(False)
+            self.match_label.setText("0 / 0")
+            return
+        
+        self.current_match = 0
+        self.goto_match()
+        self.match_label.setText(
+            f"{self.current_match + 1}/{len(self.matches)}"
+        )
 
     def goto_match(self):
         if not self.matches:

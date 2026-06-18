@@ -165,7 +165,7 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
     if not blob_info:
         raise RuntimeError("No blobs generated.!")
      
-    timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
     blob_data = {}
     total_size = 0
     for blob_name, info in blob_info.items():
@@ -233,14 +233,7 @@ def decrypt_vault(key, encrypted_blobs):
     
     return vault_lines
 
-def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
-    vault_text = editor.toPlainText().strip()
-    if not vault_text:
-        QMessageBox.information(
-            window, "PassCore", "Empty editor, Nothing to lock.!"
-        )
-        return
-    
+def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):    
     reply = QMessageBox.question(
         window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
     )
@@ -272,7 +265,7 @@ def has_blobs():
 
 def init_vault():
     vault_meta = {}
-    timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
     blob_data = {}
     total_size = 0
     vault_meta = {
@@ -440,7 +433,7 @@ def save_vault(window, editor, key):
     new_lines = editor.toPlainText().splitlines()
     create_backup()
     encrypt_vault(new_lines, key)
-    timestamp = datetime.now().strftime("%H:%M:%S")
+    timestamp = datetime.now().strftime("%I:%M:%S %p")
     window.save_label.setText(
         f"Last Save\n{timestamp}"
     )
