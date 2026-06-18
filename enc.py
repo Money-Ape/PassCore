@@ -243,7 +243,9 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
         window.status_label.setText("Locked")
 
         lock_btn.setEnabled(False)
+        lock_btn.hide()
         save_btn.setEnabled(False)
+        save_btn.hide()
         unlock_btn.setEnabled(True)
 
         unlock_btn.show()

@@ -1,7 +1,7 @@
 import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox, QFileDialog)
 from PySide6.QtGui import QAction, QIcon, QTextCursor
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
@@ -50,6 +50,7 @@ class PassCoreUI(QMainWindow):
         self.update_vault_size()
         self.vault_text = None
         self.editor.setPlainText(self.lock_screen)
+        self.key = None
         self.matches = []
         self.current_match = 0
 
@@ -91,7 +92,10 @@ class PassCoreUI(QMainWindow):
 
         # Menu Bar
         menu = self.menuBar()
-        menu.addMenu("File")
+        file_menu = menu.addMenu("File") # File Menu
+        import_action = QAction("Import", self) # File Menu : Import text files
+        import_action.triggered.connect(self.import_txt)
+        file_menu.addAction(import_action)
         
         edit_menu = menu.addMenu("Edit") # Edit Menu 
         create_backup_action = QAction("Create Backup", self) # Edit menu : Create Backup
@@ -483,6 +487,45 @@ class PassCoreUI(QMainWindow):
     def vault_close(self):
         self.close()
 
+    def import_txt(self):
+        if self.key is None:
+            QMessageBox.information(self, "PassCore", "Unlock the vault before importing...")
+            return
+        
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Import any text File", "", "Text Files (*.txt);;All Files (*)"
+        )
+        if not file_path:
+            return
+        
+        reply = QMessageBox.question(
+            self, "Import Records", "Replace current vault contents.?\n\nYes : Replace\nNo : Add", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
+        )
+        if reply == QMessageBox.Cancel:
+            return
+        
+        try:
+            with open(file_path, "r") as read_imp:
+                imported_txt = read_imp.read()
+            
+            if reply == QMessageBox.Yes:
+                self.editor.setPlainText(imported_txt)
+            
+            else:
+                content_txt = self.editor.toPlainText()
+                if content_txt.strip():
+                    self.editor.setPlainText(
+                        content_txt.rstrip() + "\n" + imported_txt
+                    )
+                else:
+                    self.editor.setPlainText(imported_txt)
+            
+            QMessageBox.information(self, "PassCore", "Records imported successfully.!")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Import Failed", str(e))
+
+
     def toggle_search(self):
         visible = self.search_input.isVisible()
 
@@ -516,10 +559,10 @@ class PassCoreUI(QMainWindow):
             
             self.matches.append(pos)
             start = pos + len(text)
-            
+
         if not self.matches:
-            self.prev_btn.setEnabled(False)
-            self.next_btn.setEnabled(False)
+            self.prev_btn.setEnabled(True)
+            self.next_btn.setEnabled(True)
             self.match_label.setText("0 / 0")
             return
         
