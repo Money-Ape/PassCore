@@ -1,6 +1,6 @@
-import zipfile, shutil, tempfile
+import zipfile, shutil, tempfile, json
 from pathlib import Path
-from backup import CONTAINER_DIR, META_FILE, SALT_FILE
+from backup import CONTAINER_DIR, META_FILE, SALT_FILE, secure_del_tree
 from PySide6.QtWidgets import (QMessageBox, QFileDialog)
 
 def import_txt(window):
@@ -60,33 +60,46 @@ def import_pcv(window):
                 archive.extractall(temp_dir)
             temp_dir = Path(temp_dir)
         
-        temp_meta = temp_dir / "meta.json"
-        temp_salt = temp_dir / "vault.salt"
+            temp_meta = temp_dir / "meta.json"
+            temp_salt = temp_dir / "vault.salt"
 
-        if not temp_meta.exists():
-            raise RuntimeError("meta.json is missing from the vault")
-        
-        if not temp_salt.exists():
-            raise RuntimeError("vault.salt is missing from the vault")
-        
-        if META_FILE.exists():
-            META_FILE.unlink()
+            if not temp_meta.exists():
+                raise RuntimeError("meta.json is missing from the vault")
+            
+            if not temp_salt.exists():
+                raise RuntimeError("vault.salt is missing from the vault")
+            
+            if META_FILE.exists():
+                META_FILE.unlink()
 
-        if SALT_FILE.exists():
-            SALT_FILE.unlink()
-        
-        if CONTAINER_DIR.exists():
-            shutil.rmtree(CONTAINER_DIR)
+            if SALT_FILE.exists():
+                SALT_FILE.unlink()
+            
+            if CONTAINER_DIR.exists():
+                secure_del_tree(CONTAINER_DIR)
 
-        shutil.copy2(temp_meta, META_FILE)
-        shutil.copy2(temp_salt, SALT_FILE)
+            shutil.copy2(temp_meta, META_FILE)
+            shutil.copy2(temp_salt, SALT_FILE)
 
-        ctn_src = temp_dir / CONTAINER_DIR.name
-        shutil.copytree(ctn_src, CONTAINER_DIR)
-        QMessageBox.information(window, "PassCore", "Vault imported successfully.")
+            with open(temp_meta, "r") as meta:
+                metadata = json.load(meta)
+                containers = {
+                    info["container"]
+                    for info in metadata["blobs"].values()
+                }
+
+                CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
+                for container in containers:
+                    path = Path(temp_dir / container)
+                    if not path.exists():
+                        raise RuntimeError(f"Missing container : {container}")
+                    else:
+                        shutil.copytree(temp_dir / container, CONTAINER_DIR / container)
+        return True
         
     except Exception as e:
         QMessageBox.critical(window, "Import Failed.!", str(e))
+        return False
 
 def export_pcv(window):
     if window.key is None:

@@ -98,8 +98,8 @@ class PassCoreUI(QMainWindow):
         import_action.triggered.connect(lambda: import_txt(self))
         file_menu.addAction(import_action)
 
-        import_vault_action = QAction("Import Vault", self)
-        import_vault_action.triggered.connect(lambda: import_pcv(self))
+        import_vault_action = QAction("Import Vault", self) # Import Vault
+        import_vault_action.triggered.connect(self.import_vault_handler)
         file_menu.addAction(import_vault_action)
 
         export_action = QAction("Export Vault", self) # File menu : Export PassCore Vault
@@ -580,6 +580,24 @@ class PassCoreUI(QMainWindow):
         self.match_label.setText(
             f"{self.current_match + 1}/{len(self.matches)}"
         )
+
+    def import_vault_handler(self):
+        success = import_pcv(self)
+        if not success:
+            return
+
+        self.editor.setPlainText(
+            self.lock_screen
+        )
+        self.editor.setReadOnly(True)
+        self.key = None
+        self.status_label.setText("Locked")
+        self.lock_btn.hide()
+        self.unlock_btn.show()
+        self.save_btn.hide()
+        self.close_btn.setEnabled(True)
+
+        QMessageBox.information(self, "PassCore", "Import complete.\n\nUnlock the imported vault to continue.")
 
 class PasswordDialog(QDialog):
     def __init__(self, title="Unlock Vault", confirm=False):

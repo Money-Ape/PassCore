@@ -1,6 +1,6 @@
 from gui import PassCoreUI, PasswordDialog
-from backup import create_backup
-import os, struct, json, platform, hashlib, uuid, shutil
+from backup import create_backup, secure_del_tree
+import os, struct, json, platform, hashlib, uuid
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -205,9 +205,9 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
     print("Saved.!\n")
     
     for ctn in old_ctn:
-        path  = CONTAINER_DIR / ctn
+        path  = Path(CONTAINER_DIR / ctn)
         if path.exists():
-            shutil.rmtree(path)
+            secure_del_tree(path)
             print(f"{GREEN}REMOVED_EXISTING - {path.name}{RESET}")
 
 def decrypt_vault(key, encrypted_blobs):

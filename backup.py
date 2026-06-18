@@ -5,6 +5,33 @@ from pathlib import Path
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
 RESET = "\033[0m"
 
+def secure_del_file(path):
+    if not path.exists():
+        return
+
+    size = path.stat().st_size
+    with open(path, "rb+") as file:
+        file.write(os.urandom(size))
+        file.flush()
+        os.fsync(file.fileno())
+    
+    path.unlink()
+
+def secure_del_tree(dir):
+    dir = Path(dir)
+    if not dir.exists():
+        return
+    
+    files = sorted(dir.rglob("*"), reverse=True)
+    for item in files:
+        if item.is_file():
+            secure_del_file(item)
+        
+        elif item.is_dir():
+            item.rmdir()
+        
+    dir.rmdir()
+
 def get_container_dir():
     sys = platform.system()
     if sys == "Linux":
