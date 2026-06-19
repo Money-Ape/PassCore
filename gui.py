@@ -16,7 +16,7 @@ class PassCoreUI(QMainWindow):
 
         self.setWindowTitle("PassCore vault")
         self.setWindowIcon(
-            QIcon("assets/PassCore.png")
+            QIcon("assets/PassCore.ico")
         )
         self.resize(1100, 700)
         self.settings = load_settings()

@@ -1,6 +1,12 @@
 # PassCore
 
-![PassCore UI](assets/PassCoreUI_test01.png)
+<p align="center">
+  <img src="assets/PassCore_logo.jpg" width="350">
+</p>
+
+<p align="center">
+  Distributed Blob Storage • Integrity Verification • Secure Vault Management
+</p>
 
 A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
 
@@ -41,6 +47,7 @@ IntegrityVerification --> MemoryReconstruction
 MemoryReconstruction --> VaultEditor
 ```
 ---
+![PassCore UI](assets/PassCoreUI_test01.png)
 
 ## Vault Unlock Flow
 
