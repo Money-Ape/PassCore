@@ -4,7 +4,7 @@
 
 A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
 
-> **Project Status:** Alpha Pre-release (v0.3.0-alpha)
+> **Project Status:** Alpha Pre-release (v0.3.5-alpha)
 
 ---
 
@@ -24,7 +24,10 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * Memory-only vault reconstruction and editing workflow
 * Integrated vault health diagnostics and integrity reporting
 * Integrated record search with match navigation and Ctrl+F support
-* PySide6 desktop graphical interface
+* Built-in cryptographically secure password generator
+* Import TXT records and import/export PassCore Vaults (.pcv)
+* Vault size tracking, timestamps, and cross-platform storage layouts
+* PySide6 desktop interface with integrated backup and management tools
 ---
 
 ```mermaid
@@ -126,31 +129,7 @@ Access:
 Tools
 └── Password Generator
 ```
-
 ---
-## Vault Health Diagnostics
-
-PassCore includes an integrated Vault Health Diagnostics system that provides visibility into vault integrity, storage status, and backup availability.
-
-![Vault Health](assets/PassCoreUI_vault_health.png)
-
-The diagnostics dashboard reports:
-
-* Vault health score
-* Metadata validation status
-* Container verification status
-* Blob existence verification
-* Blob size verification
-* SHA256 integrity verification
-* Backup availability
-* Vault statistics and storage information
-
-Access:
-
-```text
-Tools
-└── Vault Health
-```
 
 ## Search Records
 
@@ -523,8 +502,9 @@ Backup retention automatically removes older backups after the configured limit 
 ---
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Storage architecture, integrity verification, backup recovery, and platform layouts.
-- [PASSWORDGEN.md](PASSWORDGEN.md) — Password Generator architecture, workflow, configuration options, and security design.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Storage architecture, blob distribution, integrity verification, recovery workflows, and platform layouts.
+- [PASSWORDGEN.md](PASSWORDGEN.md) — Password Generator architecture, configuration options, generation workflow, and security design.
+- [MENUSYSTEM.md](MENUSYSTEM.md) — Menu hierarchy, vault operations, diagnostics dashboard, search system, import/export workflows, settings, and user interface features.
 ---
 
 ## Installation
