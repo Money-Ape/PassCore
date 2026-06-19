@@ -179,7 +179,7 @@ class PassCoreUI(QMainWindow):
         sidebar_layout = QVBoxLayout(sidebar)
 
         # Common Label Style
-        info_style = """
+        self.info_style = """
             QLabel {
                 background: #F7E6EA;
                 border: 2px solid #D8B8C4;
@@ -197,7 +197,7 @@ class PassCoreUI(QMainWindow):
         self.date_label = QLabel(
             f"Date\n{current_date}"
         )
-        self.date_label.setStyleSheet(info_style)
+        self.date_label.setStyleSheet(self.info_style)
 
         # ==================================================
         # Status
@@ -216,14 +216,14 @@ class PassCoreUI(QMainWindow):
         self.size_label = QLabel(
             "Size\n0 bytes"
         )
-        self.size_label.setStyleSheet(info_style)        
+        self.size_label.setStyleSheet(self.info_style)        
 
         # ==================================================
         # Last Save
         self.save_label = QLabel(
             "Last Save\n--"
         )
-        self.save_label.setStyleSheet(info_style)
+        self.save_label.setStyleSheet(self.info_style)
 
         # ==================================================
         # Search Rec
@@ -446,6 +446,7 @@ class PassCoreUI(QMainWindow):
             )
 
     def vault_corrupted(self):
+        self.key = None
         self.status_label.setText(
             "Corrupted"
         )
@@ -458,9 +459,16 @@ class PassCoreUI(QMainWindow):
                 font-weight: bold;                         
             }
         """)
+        self.size_label.setText("Size:\n0 bytes")
+        self.size_label.setStyleSheet(self.info_style)
+        self.editor.setReadOnly(True)
         self.editor.setPlainText(
             "Vault Integrity Verification Failed.!",
         )
+        self.lock_btn.hide()
+        self.unlock_btn.show()
+        self.save_btn.hide()
+        self.close_btn.setEnabled(True)
 
     def size_calc(self, size):
         units = ["Bytes", "KB", "MB", "GB", "TB"]
