@@ -573,7 +573,7 @@ class PassCoreUI(QMainWindow):
             len(self.search_input.text())
         )
         self.editor.setTextCursor(cursor)
-        self.editor.setFocus()
+        # self.editor.setFocus()
 
     def prev_match(self):
         if not self.matches:

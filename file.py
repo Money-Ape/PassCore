@@ -9,7 +9,8 @@ def import_txt(window):
             return
         
         file_path, _ = QFileDialog.getOpenFileName(
-            window, "Import any text File", "", "Text Files (*.txt);;All Files (*)"
+            window, "Import any text File", "", "Text Files (*.txt);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog
         )
         if not file_path:
             return
@@ -43,7 +44,8 @@ def import_txt(window):
 
 def import_pcv(window):    
     file_path, _ = QFileDialog.getOpenFileName(
-        window, "Import PassCore Vault", "","*.pcv"
+        window, "Import PassCore Vault", "","PassCore Vault (*.pcv)",
+        options=QFileDialog.Option.DontUseNativeDialog
     )
     if not file_path:
         return
@@ -110,7 +112,8 @@ def export_pcv(window):
         QMessageBox.warning(window, "PassCore", "No vault available to export.!") # prevents exporting a corrupted/uninitialized vault state.
 
     file_path, _ = QFileDialog.getSaveFileName(
-        window, "Export PassCore Vault", "PassCore_vault.pcv", "*.pcv"
+        window, "Export PassCore Vault", "PassCore_vault.pcv", "PassCore Vault (*.pcv)",
+        options=QFileDialog.Option.DontUseNativeDialog
     )
     if not file_path:
         return
