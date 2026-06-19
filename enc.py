@@ -250,8 +250,7 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
 
         unlock_btn.show()
         window.key = None
-        autolock_timer = QTimer()
-        autolock_timer.stop()
+        window.autolock_timer.stop()
         
     elif reply == QMessageBox.No:
         return
@@ -326,9 +325,10 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             window.status_label.setText("Unlocked")
             save_btn.setEnabled(True)
             lock_btn.setEnabled(True)
+            
+            minutes = window.settings["auto_lock_min"]
+            window.autolock_timer.start(minutes * 60 * 1000)
 
-            autolock_timer = QTimer()
-            autolock_timer.start(300000)
             QMessageBox.information(
                 window, "PassCore", "Create your first vault"
             )
@@ -394,8 +394,8 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             save_btn.setEnabled(True)
             lock_btn.setEnabled(True)
 
-            autolock_timer = QTimer()
-            autolock_timer.start(300000)
+            minutes = window.settings["auto_lock_min"]
+            window.autolock_timer.start(minutes * 60 * 1000)
             return
         
         except InvalidTag:
@@ -411,15 +411,16 @@ def autosave_vault(window, editor):
     
     save_vault(window, editor, window.key)
 
-def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn):
+def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     editor.clear()
     editor.setPlainText(window.lock_screen)
     editor.setReadOnly(True)
     window.status_label.setText("Locked")
 
-    lock_btn.setEnabled(False)
-    save_btn.setEnabled(False)
+    lock_btn.hide()
     unlock_btn.setEnabled(True)
+    save_btn.hide()
+    close_btn.setEnabled(True)
 
     unlock_btn.show()
     window.key = None
@@ -486,14 +487,13 @@ def user_edit():
     autosave_timer.timeout.connect(
         lambda: autosave_vault(window, editor) # triggers autosave_vault() when key is None
     )
-    
-    window.autolock_timer = QTimer() # Auto lock timer
+
     window.autolock_timer.setSingleShot(True)
     editor.textChanged.connect(
-        lambda: window.autolock_timer.start(300000)
-    )
+        lambda: window.autolock_timer.start(window.settings["auto_lock_min"] * 60 * 1000))
+    
     window.autolock_timer.timeout.connect(
-        lambda: autolock_vault(window, editor, save_btn, unlock_btn, lock_btn)
+        lambda: autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn)
     )
 
     unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)

@@ -1,12 +1,14 @@
 import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog)
 from PySide6.QtGui import QAction, QIcon, QTextCursor
+from PySide6.QtCore import QTimer
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
 from health import vault_health
 from file import import_txt, import_pcv, export_pcv
+from settings import load_settings, save_settings
 
 class PassCoreUI(QMainWindow):
     def __init__(self):
@@ -17,6 +19,9 @@ class PassCoreUI(QMainWindow):
             QIcon("assets/PassCore.png")
         )
         self.resize(1100, 700)
+        self.settings = load_settings()
+        self.autolock_timer = QTimer()
+        
         self.build_ui()
         self.lock_screen = (
             "mww mww hwm wwl mwwMmwwww wwwmmmwww mwww wwl w wlwwww\n"
@@ -105,7 +110,12 @@ class PassCoreUI(QMainWindow):
         export_action = QAction("Export Vault", self) # File menu : Export PassCore Vault
         export_action.triggered.connect(lambda: export_pcv(self))
         file_menu.addAction(export_action)
-        
+
+        settings_menu = file_menu.addMenu("Settings") # File menu : Settings menu
+        autolock_action = QAction("Auto-Lock Timer", self)
+        autolock_action.triggered.connect(self.change_autolock_timer)
+        settings_menu.addAction(autolock_action)
+                
         edit_menu = menu.addMenu("Edit") # Edit Menu 
         create_backup_action = QAction("Create Backup", self) # Edit menu : Create Backup
         create_backup_action.triggered.connect(self.create_backup_now)
@@ -606,6 +616,26 @@ class PassCoreUI(QMainWindow):
         self.close_btn.setEnabled(True)
 
         QMessageBox.information(self, "PassCore", "Import complete.\n\nUnlock the imported vault to continue.")
+
+    def change_autolock_timer(self):
+        current = self.settings["auto_lock_min"]
+
+        minutes, ok = QInputDialog.getInt(
+            self, "Auto-Lock Timer",
+            "Minutes: ", current,
+            1, 120
+        )
+        if not ok:
+            return
+        
+        self.settings["auto_lock_min"] = minutes
+        save_settings(self.settings)
+        if self.key is not None: 
+            self.autolock_timer.setInterval(minutes * 60 * 1000)
+        
+        QMessageBox.information(
+            self,"PassCore", f"Auto-Lock Timer set to {minutes} minute(s)."
+        )            
 
 class PasswordDialog(QDialog):
     def __init__(self, title="Unlock Vault", confirm=False):
