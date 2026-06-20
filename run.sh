@@ -1,50 +1,39 @@
 #!/usr/bin/bash
 
-modules=$(python - << 'EOF'
-import importlib, sys
+if [ ! -d "venv" ]; then
+    echo "virtual environment not found.!"
+    echo "creating venv..."
 
-modules = ["cryptography", "argon2", "PySide6"]
-missing = []
-for mod in modules:
-    try:
-        importlib.import_module(mod)
-    except ImportError:
-        missing.append(mod)
-        print(f"\n{mod}.....missing")
-if missing:
-    sys.exit(1)
-sys.exit(0)
-EOF
-)
-
-modules_missing=$?
-
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    System_ID="$ID"
-
-    echo -e "\nSystem: $System_ID[$NAME]\n"
-    if [ "$System_ID" = "arch" ]; then
-        if [ $modules_missing -ne 0 ]; then
-            sudo pacman -Syy python-cryptography \
-            python-argon2-cffi \
-            python-argon2-cffi-bindings \
-            pyside6
-        else
-            echo "Initializing....."
-        fi
-
-    elif [ "$System_ID" = "debian" ] || [ "$System_ID" = "ubuntu" ]; then
-        if [ $modules_missing -ne 0 ]; then
-            sudo apt-get update; sudo apt-get install python3-cryptography \
-            python3-argon2 \
-            pyside6
-        else
-            echo "Initializing....."
-        fi
-    else
-        echo "You ain't dumb than your machine.! right.?"
-    fi
+    python3 -m venv venv || {
+        echo "Failed to create venv."
+        exit 1
+    }
 fi
 
-python enc*.py
+source venv/bin/activate
+
+python - << 'EOF'
+import importlib, subprocess, sys
+
+modules = {
+    "cryptography" : "cryptography",
+    "argon2" : "argon2-cffi",
+    "PySide6" : "PySide6"
+}
+
+missing = []
+for module, package in modules.items():
+    try:
+        importlib.import_module(module)
+    
+    except ImportError:
+        missing.append(package)
+
+if missing:
+    print(f"Installing... {' '.join(missing)}")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
+
+EOF
+
+echo "Initializing..."
+python3 enc*.py
