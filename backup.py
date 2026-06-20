@@ -1,6 +1,7 @@
 import os, zipfile, platform, shutil
 from datetime import datetime
 from pathlib import Path
+from PySide6.QtWidgets import QFileDialog
 
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
 RESET = "\033[0m"
@@ -85,24 +86,28 @@ def create_backup():
 
 def restore_backup():
     backupzip_dir = Path.home() / "Documents" / "PassCore Backups"
-    zip_frompath = sorted(backupzip_dir.iterdir(), reverse=True)
 
-    if not zip_frompath:
-        print("no backups found.!")
+    backup_file, _ = QFileDialog.getOpenFileName(
+        None, "Select Backup Zip", str(backupzip_dir), "", "Zip archives (*.zip)",
+        options=QFileDialog.Option.DontUseNativeDialog
+        )
+    if not backup_file:
         return
-    else:
-        latest_backups = zip_frompath[0]
-        if CONTAINER_DIR.exists():
-            secure_del_tree(CONTAINER_DIR)
-        CONTAINER_DIR.mkdir(parents=True, exist_ok=True) # Will create Empty Dir.
-        
-        if META_FILE.exists() or SALT_FILE.exists():
-            META_FILE.unlink()
-            SALT_FILE.unlink()
+    
+    backup_file = Path(backup_file)
+    if CONTAINER_DIR.exists():
+        secure_del_tree(CONTAINER_DIR)
+    CONTAINER_DIR.mkdir(parents=True, exist_ok=True) # Will create Empty Dir.
+    
+    if META_FILE.exists():
+        META_FILE.unlink()
 
-        with zipfile.ZipFile(latest_backups, "r") as backfrom_zip:
-            backfrom_zip.extractall(CONTAINER_DIR) 
-            shutil.move(CONTAINER_DIR / "meta.json", PASSCORE_DIR)
-            shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
+    if SALT_FILE.exists():
+        SALT_FILE.unlink()
 
-    print(f"Recovered from {latest_backups.name}")
+    with zipfile.ZipFile(backup_file, "r") as backfrom_zip:
+        backfrom_zip.extractall(CONTAINER_DIR) 
+        shutil.move(CONTAINER_DIR / "meta.json", PASSCORE_DIR)
+        shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
+
+    print(f"Recovered from {backup_file.name}")
