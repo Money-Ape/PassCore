@@ -4,6 +4,11 @@
 *.key
 *.salt
 
+packaging/linux/src
+packaging/linux/pkg
+packaging/linux/PassCore
+packaging/linux/*.pkg.tar.zst
+
 # Vscode
 .vscode
 

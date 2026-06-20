@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=PassCore
+Comment=Secure Password Manager
+Exec=passcore
+Icon=passcore
+Terminal=false
+Type=Application
+Categories=Utility;Security;
+
