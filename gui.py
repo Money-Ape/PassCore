@@ -437,6 +437,17 @@ class PassCoreUI(QMainWindow):
 
     def restore_backup_now(self):
         restore_backup()
+        self.key = None
+        self.editor.setPlainText(self.lock_screen)
+        self.editor.setReadOnly(True)
+        self.status_label.setText("Locked")
+        self.lock_btn.hide()
+        self.unlock_btn.setEnabled(True)
+        self.unlock_btn.show()
+        self.save_btn.hide()
+        self.close_btn.setEnabled(True)
+
+        QMessageBox.information(self, "PassCore Restore", "Backup restored successfully.!\n\nUnlock the restored vault to continue.!")
         self.update_vault_size()
 
     def open_backup_folder(self):

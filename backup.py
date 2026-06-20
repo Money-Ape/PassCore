@@ -93,7 +93,7 @@ def restore_backup():
     else:
         latest_backups = zip_frompath[0]
         if CONTAINER_DIR.exists():
-            shutil.rmtree(CONTAINER_DIR)
+            secure_del_tree(CONTAINER_DIR)
         CONTAINER_DIR.mkdir(parents=True, exist_ok=True) # Will create Empty Dir.
         
         if META_FILE.exists() or SALT_FILE.exists():
