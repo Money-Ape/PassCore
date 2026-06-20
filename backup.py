@@ -1,7 +1,7 @@
 import os, zipfile, platform, shutil
 from datetime import datetime
 from pathlib import Path
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
 RESET = "\033[0m"
@@ -84,11 +84,11 @@ def create_backup():
 
     print(f"\nBackup Created[{GREEN}{zip_dir}{RESET}]")
 
-def restore_backup():
+def restore_backup(window):
     backupzip_dir = Path.home() / "Documents" / "PassCore Backups"
 
     backup_file, _ = QFileDialog.getOpenFileName(
-        None, "Select Backup Zip", str(backupzip_dir), "", "Zip archives (*.zip)",
+        window, "Select Backup Zip", str(backupzip_dir), "", "Zip archives (*.zip)",
         options=QFileDialog.Option.DontUseNativeDialog
         )
     if not backup_file:
@@ -111,3 +111,15 @@ def restore_backup():
         shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
 
     print(f"Recovered from {backup_file.name}")
+
+    window.key = None
+    window.editor.setPlainText(window.lock_screen)
+    window.editor.setReadOnly(True)
+    window.status_label.setText("Locked")
+    window.lock_btn.hide()
+    window.unlock_btn.setEnabled(True)
+    window.unlock_btn.show()
+    window.save_btn.hide()
+    window.close_btn.setEnabled(True)
+
+    QMessageBox.information(window, "PassCore Restore", "Backup restored successfully.!\n\nUnlock the restored vault to continue.!")
