@@ -1,7 +1,7 @@
 import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem)
 from PySide6.QtGui import QAction, QIcon, QTextCursor
 from PySide6.QtCore import QTimer, Qt
 from backup import create_backup, restore_backup, META_FILE
@@ -9,6 +9,7 @@ from passgen import generate_password
 from health import vault_health
 from file import import_txt, import_pcv, export_pcv
 from settings import load_settings, save_settings
+from theme import THEMES, BUTTONS
 
 class PassCoreUI(QMainWindow):
     def __init__(self):
@@ -21,7 +22,7 @@ class PassCoreUI(QMainWindow):
         self.resize(1300, 800)
         self.settings = load_settings()
         self.autolock_timer = QTimer()
-        
+        self.apply_themes()
         self.build_ui()
         self.lock_screen = (
             "mww mww hwm wwl mwwMmwwww wwwmmmwww mwww wwl w wlwwww\n"
@@ -60,40 +61,83 @@ class PassCoreUI(QMainWindow):
         self.matches = []
         self.current_match = 0
 
+    def apply_themes(self):
+        theme = THEMES[self.settings["theme"]]
+
+        self.i = theme["interactive"]
+        self.w = theme["workspace"]
+        self.t = theme["text"]
+
+        self.lock_theme = BUTTONS["lock"]
+        self.unlock_theme = BUTTONS["unlock"]
+        self.save_theme = BUTTONS["save"]
+        self.close_theme = BUTTONS["close"]
+        
+        self.STATUS_COLORS = {
+            "locked": "#D4AF37",
+            "unlocked": "#4CAF50",
+            "corrupted": "#E53935"
+        }
+
+    def open_theme_dialog(self):
+        dialog = ThemeDialog(self)
+
+        if not dialog.exec():
+            return
+
+        selected_theme = dialog.theme_combo.currentData()
+        if selected_theme == self.settings["theme"]:
+            return
+
+        reply = QMessageBox.question(
+            self, "PassCore Theme", "Applying a new theme need restart the vault.\nContinue?", QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        self.settings["theme"] = selected_theme
+        save_settings(self.settings)
+        self.apply_themes()
+
+        QMessageBox.information(
+            self, "PassCore", "Theme applied.\nKindly restart the PassCore vault to load the Theme.!."
+        )
+
     def build_ui(self):
 
         # Main Window Theme
-        self.setStyleSheet("""        
-            QWidget {
-                background-color: #0B1120;
-                color: #E5E7EB;
-            }
-            QMenuBar {
-                background-color: #111827;
-                color: #E5E7EB;
-            }
-            QMenuBar::item {
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {self.w};
+                color: {self.t};
+            }}
+            QMenuBar {{
+                background-color: {self.w};
+                color: {self.t};
+                border: ;
+            }}
+            QMenuBar::item {{
                 background: transparent;
-                color: #E5E7EB;
+                color: {self.t};
                 padding: 6px 10px;
-            }
-            QMenuBar::item:selected {
-                background-color: #D4AF37;
-                color: #111827;
+            }}
+            QMenuBar::item:selected {{
+                background-color: {self.i};
+                color: {self.t};
                 border-radius: 4px;
-            }
-            QMenu {
-                background-color: #111827;
-                color: #E5E7EB;
-                border: 1px solid #374151;
-            }
-            QMenu::item {
+            }}
+            QMenu {{
+                background-color: {self.w};
+                color: {self.t};
+                border: 2px solid {self.i};
+            }}
+            QMenu::item {{
                 padding: 6px 20px;
-            }
-            QMenu::item:selected {
-                background-color: #D4AF37;
-                color: #111827;
-            }
+            }}
+            QMenu::item:selected {{
+                background-color: {self.i};
+                color: {self.t};
+            }}
         """)
 
         # Menu Bar
@@ -115,6 +159,10 @@ class PassCoreUI(QMainWindow):
         autolock_action = QAction("Auto-Lock Timer", self)
         autolock_action.triggered.connect(self.change_autolock_timer)
         settings_menu.addAction(autolock_action)
+
+        theme_action = QAction("Theme", self) # File menu : Themes
+        theme_action.triggered.connect(self.open_theme_dialog)
+        settings_menu.addAction(theme_action)
                 
         edit_menu = menu.addMenu("Edit") # Edit Menu 
         create_backup_action = QAction("Create Backup", self) # Edit menu : Create Backup
@@ -153,19 +201,19 @@ class PassCoreUI(QMainWindow):
         # ==================================================
         # Editor
         self.note_title = QLineEdit()
-        self.note_title.setStyleSheet("""
-            QLineEdit {
-                background-color: #111827;
-                color: #f9fafb;
-                border: 1px solid #374151;
+        self.note_title.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 8px;
                 font-size: 14px;
                 font-weight: bold;
-            }
-            QLineEdit:focus {
-                border: 2px solid #14b8a6;
-            }
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {self.t};
+            }}
         """)
 
         self.note_title.setPlaceholderText("Note Title")
@@ -176,19 +224,40 @@ class PassCoreUI(QMainWindow):
         )
         self.editor.setReadOnly(True)
 
-        self.editor.setStyleSheet("""
-            QTextEdit {
-                background: #1A2233;
-                color: #E5E7EB;
-                border: 1px solid #374151;
+        self.editor.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {self.w};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 10px;
                 padding: 10px;
                 font-family: "JetBrains Mono";
                 font-size: 12pt;
-                selection-background-color: #D4AF37;
-                selection-color: #202020;
-            }
+            }}
+            QScrollBar:vertical {{
+                background: {self.w};
+                width: 10px;
+                border: none;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {self.i};
+                border-radius: 4px;
+                min-height: 30px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {self.t};
+            }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{
+                height: 0px;
+                border: none;
+            }}
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {{
+                background: transparent;
+            }}
         """)
+
         # Notes
         self.current_note = 0
         self.notes = [{
@@ -199,45 +268,48 @@ class PassCoreUI(QMainWindow):
         # Left Panel for Notes
         self.note_title.textChanged.connect(self.rename_note)
         self.add_note_btn = QPushButton("+")
-        self.add_note_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1f2937;
-                color: white;
-                border: 1px solid #374151;
+        self.add_note_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 8px;
                 font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #374151;
-            }
-            QPushButton:pressed {
-                background-color: #4b5563;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {self.w};
+                border: 2px solid {self.i};
+            }}
+            QPushButton:pressed {{
+                background-color: {self.i};
+            }}
         """)
         
         self.note_list = QListWidget()
-        self.note_list.setStyleSheet("""
-            QListWidget {
-                background-color: #0B1120;
-                color: #e5e7eb;
-                border: 1px solid #1f2937;
+        self.note_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 4px;
                 outline: none;
-            }
-            QListWidget::item {
+            }}
+            QListWidget::item {{
                 padding: 8px;
                 border-radius: 4px;
-            }
-            QListWidget::item:hover {
-                background-color: #1f2937;
-            }
-            QListWidget::item:selected {
-                background-color: #d4af37;
-                color: #111827;
-            }
+            }}
+            QListWidget::item:hover {{
+                background-color: {self.w};
+                color: {self.t};
+            }}
+            QListWidget::item:selected {{
+                background-color: {self.t};
+                color: {self.w};
+                font-weight: bold;
+            }}
         """)
 
         self.note_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -267,28 +339,30 @@ class PassCoreUI(QMainWindow):
         # Sidebar
         sidebar = QFrame()
         sidebar.setFixedWidth(230)
-        sidebar.setStyleSheet("""
-            QFrame {
-                background-color: #0B1120;
-                border: 1px solid #1f2937;
+        sidebar.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.w};
+                border: 2px solid {self.i};
                 border-radius: 10px;
-            }
-            QLabel {
-                color: #e5e7eb;
-            }
+            }}
+            QLabel {{
+                color: {self.t};
+                background: transparent;
+                border: none;
+            }}
         """)
         sidebar_layout = QVBoxLayout(sidebar)
 
         # Common Label Style
-        self.info_style = """
-            QLabel {
-                background-color: #111827;
-                border: 1px solid #374151;
+        self.info_style = f"""
+            QLabel {{
+                background-color: {self.w};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 8px;
-                color: #E5E7EB;
+                color: {self.t};
                 font-size: 11pt;
-            }
+            }}
         """
 
         # ==================================================
@@ -330,56 +404,45 @@ class PassCoreUI(QMainWindow):
         # Search Rec
         self.search_input = QLineEdit() # Search Input
         self.match_label = QLabel("0 / 0") # Match text counts
-        self.match_label.setStyleSheet("""
-            QLabel {
-                background: #FFF8FA;
-                color: #C0392B;
-                border: 2px solid #D8B8C4;
+        self.match_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {self.i};
+                color: #E53935;
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 4px;
                 font-weight: bold;
                 font-size: 10pt;
-            }
+            }}
         """)
         
-        self.prev_btn = QPushButton("◀") # Previous jump button
-        self.prev_btn.setFixedWidth(60)
-        self.prev_btn.setStyleSheet("""
-            QPushButton {
-                background: #5D6D7E;
-                color: white;
-                border: none;
+        nav_btn_style = (f"""
+            QPushButton {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 font-weight: bold;
                 font-size: 12pt;
-            }
-            QPushButton:hover {
-                background: #708090;
-            }
-            QPushButton:pressed {
-                background: #4A5568;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {self.w};
+                border: 2px solid {self.i};
+            }}
+            QPushButton:pressed {{
+                background-color: {self.t};
+                color: {self.w};
+            }}
         """)
+
+        self.prev_btn = QPushButton("◀") # Previous jump button
+        self.prev_btn.setFixedWidth(60)
+        self.prev_btn.setStyleSheet(nav_btn_style)
         self.prev_btn.clicked.connect(self.prev_match)
 
         self.next_btn = QPushButton("▶") # Next jump button
         self.next_btn.setFixedWidth(60)
-        self.next_btn.setStyleSheet("""
-            QPushButton {
-                background: #5D6D7E;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                font-weight: bold;
-                font-size: 12pt;
-            }
-            QPushButton:hover {
-                background: #708090;
-            }
-            QPushButton:pressed {
-                background: #4A5568;
-            }
-        """)
+        self.next_btn.setStyleSheet(nav_btn_style)
         self.next_btn.clicked.connect(self.next_match)
 
         self.search_input.hide()
@@ -388,14 +451,20 @@ class PassCoreUI(QMainWindow):
         self.next_btn.hide()
 
         self.search_input.setPlaceholderText("Search...")
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background: #F7E6EA;
-                border: 2px solid #D8B8C4;
+        self.search_input.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 6px;
-                color: #202020;
-            }
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {self.t};
+            }}
+            QLineEdit::placeholder {{
+                color: {self.t};
+            }}
         """)
         search_nav_layout = QHBoxLayout()
         search_nav_layout.addWidget(self.match_label)
@@ -434,70 +503,66 @@ class PassCoreUI(QMainWindow):
         self.close_btn.clicked.connect(self.vault_close)
 
         # Lock Button
-        self.lock_btn.setStyleSheet("""
-            QPushButton {
-                background: #d9534f;
-                background-color: #1f2937;
-                color: #d4af37;
-                border: 2px solid #374151;
+        self.lock_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.lock_theme["bg"]};
+                color: {self.lock_theme["text"]};
+                border: none;
                 border-radius: 8px;
                 padding: 10px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #273549;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {self.lock_theme["hover"]};
+            }}
         """)
 
         # Unlock Button
-        self.unlock_btn.setStyleSheet("""
-            QPushButton {
-                background: #5cb85c;
-                color: black;
-                border: 2px solid black;
+        self.unlock_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.unlock_theme["bg"]};
+                color: {self.unlock_theme["text"]};
+                border: none;
                 border-radius: 8px;
-                padding: 8px;
+                padding: 10px;
                 font-weight: bold;
-            }
-
-            QPushButton:hover {
-                background: #70c670;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {self.unlock_theme["hover"]};
+            }}
         """)
 
         # Save Button
-        self.save_btn.setStyleSheet("""
-            QPushButton {
-                background: #7ea6e0;
-                background-color: #d4af37;
-                color: #111827;
+        self.save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.save_theme["bg"]};
+                color: {self.save_theme["text"]};
                 border: none;
                 border-radius: 8px;
                 padding: 10px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #e6c65c;
-            }
-            QPushButton:pressed {
-                background-color: #b8941f;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {self.save_theme["hover"]};
+            }}
         """)
 
         # Close Button
-        self.close_btn.setStyleSheet("""
-            QPushButton {
-                background: #d6d6d6;
-                background-color: #374151;
-                color: white;
+        self.close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.close_theme["bg"]};
+                color: {self.close_theme["text"]};
+
                 border: none;
                 border-radius: 8px;
+
                 padding: 10px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #4b5563;
-            }
+            }}
+
+            QPushButton:hover {{
+                background-color: {self.close_theme["hover"]};
+            }}
         """)
 
         # Button Layouts
@@ -660,14 +725,14 @@ class PassCoreUI(QMainWindow):
         self.status_label.setText(
             "Corrupted"
         )
-        self.status_label.setStyleSheet("""
-            QLabel {
+        self.status_label.setStyleSheet(f"""
+            QLabel {{
                 border: None;
                 background: transparent;
-                color: #E67E22;
+                color: {self.STATUS_COLORS}["corrupted"];
                 font-size: 15pt;
                 font-weight: bold;                         
-            }
+            }}
         """)
         self.size_label.setText("Size:\n0 bytes")
         self.size_label.setStyleSheet(self.info_style)
@@ -844,16 +909,112 @@ class PassCoreUI(QMainWindow):
             self,"PassCore", f"Auto-Lock Timer set to {minutes} minute(s)."
         )            
 
+class ThemeDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Theme")
+
+        current_theme = (
+            parent.settings["theme"]
+            if parent
+            else "light_grey"
+        )
+
+        theme = THEMES[current_theme]
+        i = theme["interactive"]
+        w = theme["workspace"]
+        t = theme["text"]
+
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {w};
+            }}
+            QLabel {{
+                color: {t};
+            }}
+            QComboBox {{
+                background-color: {i};
+                color: {t};
+                border: 2px solid {i};
+                border-radius: 8px;
+                padding: 6px;
+            }}
+            QPushButton {{
+                background-color: {i};
+                color: {t};
+
+                border: 2px solid {i};
+                border-radius: 8px;
+                padding: 6px;
+            }}
+            QPushButton:hover {{
+                background-color: {w};
+            }}
+        """)
+
+        self.setFixedSize(300, 150)
+        layout = QVBoxLayout()
+        label = QLabel("Choose a Theme")
+
+        self.theme_combo = QComboBox()
+        for theme_name in THEMES:
+            self.theme_combo.addItem(
+                theme_name.replace("_", " ").title(), theme_name
+            )
+
+        index = self.theme_combo.findData(current_theme)
+        if index >= 0:
+            self.theme_combo.setCurrentIndex(index)
+        
+        btn_layout = QHBoxLayout()
+        
+        ok_btn = QPushButton("Apply")
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+
+        layout.addWidget(label)
+        layout.addWidget(self.theme_combo)
+        layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        self.setLayout(layout)
+
 class PasswordDialog(QDialog):
     def __init__(self, title="PassCore Vault", confirm=False):
         super().__init__()
+        self.settings = load_settings()
+        self.apply_themes()
         self.confirm = confirm
         self.setWindowTitle(title)
         self.setWindowIcon(QIcon("assets/PassCore.png"))
-        self.setStyleSheet("""
-            background-color: #111827;
-            color: #E5E7EB;
-            border-bottom: 1px solid #374151;
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {self.w};
+                color: {self.t};
+            }}
+            QLabel {{
+                color: {self.t};
+                background: transparent;
+                border: none;
+            }}
+            QLineEdit {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
+                border-radius: 8px;
+                padding: 8px;
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {self.t};
+            }}
+            QCheckBox {{
+                color: {self.t};
+                background: transparent;
+            }}
         """)
 
         self.password = QLineEdit()
@@ -887,6 +1048,24 @@ class PasswordDialog(QDialog):
         
         layout.addLayout(btn_layout)
         self.setLayout(layout)
+    
+    def apply_themes(self):
+        theme = THEMES[self.settings["theme"]]
+
+        self.i = theme["interactive"]
+        self.w = theme["workspace"]
+        self.t = theme["text"]
+
+        self.lock_theme = BUTTONS["lock"]
+        self.unlock_theme = BUTTONS["unlock"]
+        self.save_theme = BUTTONS["save"]
+        self.close_theme = BUTTONS["close"]
+        
+        self.STATUS_COLORS = {
+            "locked": "#D4AF37",
+            "unlocked": "#4CAF50",
+            "corrupted": "#E53935"
+        }
 
     def toggle_password(self, checked):
         mode = (QLineEdit.EchoMode.Normal
@@ -908,47 +1087,53 @@ class PasswordDialog(QDialog):
         self.accept()
 
 class PasswordGenerator(QDialog):
-
     def __init__(self, title="PassCore Password Generator"):
         super().__init__()
+        self.settings = load_settings()
+        self.apply_themes()
         self.setWindowTitle(title)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #0B1120;
-                color: #E5E7EB;
-            }
-            QLabel {
-                color: #E5E7EB;
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {self.w};
+                color: {self.t};
+            }}
+            QLabel {{
+                color: {self.t};
                 font-size: 11pt;
-            }
-            QLineEdit {
-                background-color: #111827;
-                color: #E5E7EB;
-                border: 1px solid #374151;
+                background: transparent;
+            }}
+            QLineEdit {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 8px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #D4AF37;
-            }
-            QCheckBox {
-                color: #E5E7EB;
-            }
-            QPushButton {
-                background-color: #1F2937;
-                color: #E5E7EB;
-                border: 1px solid #374151;
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {self.t};
+            }}
+            QCheckBox {{
+                color: {self.t};
+                background: transparent;
+            }}
+            QPushButton {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 8px;
                 min-width: 80px;
-            }
-            QPushButton:hover {
-                background-color: #2B3648;
-            }
-            QPushButton:pressed {
-                background-color: #374151;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {self.w};
+                border: 2px solid {self.i};
+            }}
+            QPushButton:pressed {{
+                background-color: {self.t};
+                color: {self.w};
+            }}
         """)
+
         self.lenght_spin = QSpinBox()
         self.lenght_spin.setRange(8, 128)
         self.lenght_spin.setValue(19)
@@ -995,6 +1180,24 @@ class PasswordGenerator(QDialog):
         self.setLayout(layout)
         self.generate_passwd()
 
+    def apply_themes(self):
+        theme = THEMES[self.settings["theme"]]
+
+        self.i = theme["interactive"]
+        self.w = theme["workspace"]
+        self.t = theme["text"]
+
+        self.lock_theme = BUTTONS["lock"]
+        self.unlock_theme = BUTTONS["unlock"]
+        self.save_theme = BUTTONS["save"]
+        self.close_theme = BUTTONS["close"]
+        
+        self.STATUS_COLORS = {
+            "locked": "#D4AF37",
+            "unlocked": "#4CAF50",
+            "corrupted": "#E53935"
+        }
+
     def generate_passwd(self):
         password = generate_password(
             length=self.lenght_spin.value(),
@@ -1006,9 +1209,10 @@ class PasswordGenerator(QDialog):
         self.output.setText(password)
 
 class VaultHealthDialog(QDialog):
-
     def __init__(self):
         super().__init__()
+        self.settings = load_settings()
+        self.apply_themes()
         report = vault_health()
         self.setWindowTitle("Vault Health")
         self.setFixedSize(500, 550)
@@ -1027,34 +1231,36 @@ class VaultHealthDialog(QDialog):
             health = "🔴 CRITICAL"
             color = "#E53935"
 
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #0B1120;
-            }
-            QFrame {
-                background-color: #111827;
-                border: 1px solid #374151;
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {self.w};
+            }}
+            QFrame {{
+                background-color: {self.i};
+                border: 2px solid {self.i};
                 border-radius: 8px;
-            }
-            QLabel {
-                color: #E5E7EB;
+            }}
+            QLabel {{
+                color: {self.t};
                 border: none;
                 background: transparent;
-            }
-            QPushButton {
-                background-color: #D4AF37;
-                color: #111827;
-                border: none;
+            }}
+            QPushButton {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 2px solid {self.i};
                 border-radius: 8px;
                 padding: 8px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #E6C65C;
-            }
-            QPushButton:pressed {
-                background-color: #B8941F;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {self.w};
+                border: 2px solid {self.i};
+            }}
+            QPushButton:pressed {{
+                background-color: {self.t};
+                color: {self.w};
+            }}
         """)
 
         # ==========================================
@@ -1071,12 +1277,12 @@ class VaultHealthDialog(QDialog):
         score_label = QLabel(
             f"Score: {score}/100"
         )
-        score_label.setStyleSheet("""
-            QLabel {
+        score_label.setStyleSheet(f"""
+            QLabel {{
                 font-size: 16pt;
                 font-weight: bold;
-                color: #E5E7EB;
-            }
+                color: {self.t};
+            }}
         """)
 
         # ==========================================
@@ -1087,12 +1293,12 @@ class VaultHealthDialog(QDialog):
         info_title = QLabel(
             "Vault Information"
         )
-        info_title.setStyleSheet("""
-            QLabel {
+        info_title.setStyleSheet(f"""
+            QLabel {{
                 font-size: 13pt;
                 font-weight: bold;
-                color: #D4AF37;
-            }
+                color: {self.i};
+            }}
         """)
 
         info_label = QLabel(f"""
@@ -1122,12 +1328,12 @@ class VaultHealthDialog(QDialog):
         checks_layout = QVBoxLayout()
 
         checks_title = QLabel("Integrity Checks")
-        checks_title.setStyleSheet("""
-            QLabel {
+        checks_title.setStyleSheet(f"""
+            QLabel {{
                 font-size: 13pt;
                 font-weight: bold;
-                color: #D4AF37;
-            }
+                color: {self.t};
+            }}
         """)
 
         checks_layout.addWidget(checks_title)
@@ -1179,6 +1385,24 @@ class VaultHealthDialog(QDialog):
         layout.addStretch()
         layout.addWidget(close_btn)
         self.setLayout(layout)
+    
+    def apply_themes(self):
+        theme = THEMES[self.settings["theme"]]
+
+        self.i = theme["interactive"]
+        self.w = theme["workspace"]
+        self.t = theme["text"]
+
+        self.lock_theme = BUTTONS["lock"]
+        self.unlock_theme = BUTTONS["unlock"]
+        self.save_theme = BUTTONS["save"]
+        self.close_theme = BUTTONS["close"]
+        
+        self.STATUS_COLORS = {
+            "locked": "#D4AF37",
+            "unlocked": "#4CAF50",
+            "corrupted": "#E53935"
+        }
     
     def refresh(self):
         self.close()
