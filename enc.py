@@ -145,21 +145,21 @@ def split_file_bin(encrypted_data, chunk_size=32):
 
     return blob_info
 
-def encrypt_vault(new_lines, key): # Encrypt raw bytes
+def encrypt_vault(notes, key): # Encrypt raw bytes
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
 
     encrypted_data = bytearray()
-    for i, line in enumerate(new_lines):
-        line = line.strip()
 
-        nonce = os.urandom(12)
-        encrypt_enc_d = enc_cipher.encrypt(nonce, line.encode(), None) # Encrypt string to bytes
-        record_enc_d = nonce + encrypt_enc_d
-        length = len(record_enc_d)
+    payload = json.dumps(notes, ensure_ascii=False).encode()
 
-        encrypted_data.extend(struct.pack(">I", length)) # store encrypted raw bytes length
-        encrypted_data.extend(record_enc_d) # store encrypted raw bytes record with nonce
-        # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
+    nonce = os.urandom(12)
+    encrypt_enc_d = enc_cipher.encrypt(nonce, payload, None) # Encrypt string to bytes
+    record_enc_d = nonce + encrypt_enc_d
+    length = len(record_enc_d)
+
+    encrypted_data.extend(struct.pack(">I", length)) # store encrypted raw bytes length
+    encrypted_data.extend(record_enc_d) # store encrypted raw bytes record with nonce
+    # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
     blob_info = split_file_bin(bytes(encrypted_data), chunk_size=32)
     if not blob_info:
@@ -210,9 +210,14 @@ def encrypt_vault(new_lines, key): # Encrypt raw bytes
             secure_del_tree(path)
             print(f"{GREEN}REMOVED_EXISTING - {path.name}{RESET}")
 
+def serialize_notes(notes):
+    return json.dumps(notes, ensure_ascii=False)
+
+def deserialize_notes(data):
+    return json.loads(data)
+
 def decrypt_vault(key, encrypted_blobs):
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
-    vault_lines = []
     try:
         offset = 0
         while offset < len(encrypted_blobs):
@@ -226,21 +231,32 @@ def decrypt_vault(key, encrypted_blobs):
             offset += length
             nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
             decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
-            vault_lines.append(decrypt_enc_d.decode())
+            payload = decrypt_enc_d.decode()
+            notes = json.loads(payload)
                 
     except FileNotFoundError as e1:
         print(f"{RED}Error: {RESET}", e1)
     
-    return vault_lines
+    return notes
 
 def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):    
     reply = QMessageBox.question(
         window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
     )
     if reply == QMessageBox.Yes:
+        window.note_list.clear()
+        window.note_title.clear()
+        window.notes = [{
+            "title": "Locked",
+            "content": ""
+        }]
+        window.current_note = 0
+        editor.clear()
         editor.setPlainText(window.lock_screen)
         editor.setReadOnly(True)
         window.status_label.setText("Locked")
+        window.add_note_btn.setEnabled(False)
+        window.note_title.setEnabled(False)
 
         lock_btn.setEnabled(False)
         lock_btn.hide()
@@ -319,6 +335,8 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             close_btn.show()
             lock_btn.show()
             unlock_btn.hide()
+            window.add_note_btn.setEnabled(True)
+            window.note_title.setEnabled(True)
 
             editor.clear()
             editor.setReadOnly(False)
@@ -379,15 +397,17 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         ) 
         window.key = key
         try:
-            vault_lines = decrypt_vault(key, encrypted_blobs)
+            vault_notes = decrypt_vault(key, encrypted_blobs)
             
             unlock_btn.hide()
+            window.add_note_btn.setEnabled(True)
+            window.note_title.setEnabled(True)
             
             editor.show()
             save_btn.show()
             close_btn.show()
             lock_btn.show()
-            editor.setPlainText("\n".join(vault_lines))
+            window.load_notes(vault_notes)
             editor.setReadOnly(False)
             window.status_label.setText("Unlocked")
 
@@ -402,20 +422,39 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             QMessageBox.information(window, "PassCore", "wrong master password.!")
 
 def autosave_vault(window, editor):
-    vault_text = editor.toPlainText().strip()
-    if not vault_text:
+    window.save_current_note()
+    non_empty_notes = sum(
+        1 for note in window.notes
+        if note["content"].strip()
+    )
+    if len(window.notes) == 1 and non_empty_notes == 0:
+        QMessageBox.information(
+            window, "PassCore", "Empty vault.!\nNothing to save."
+        )
         return
     
     if window.key is None:
         return
     
     save_vault(window, editor, window.key)
+    timestamp = datetime.now().strftime("%I:%M:%S %p")
+    window.save_label.setText(
+        f"Last Save:\n{timestamp}"
+    )
 
 def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
+    window.note_list.clear()
+    window.note_title.clear()
+    window.notes = [{
+            "title": "Locked",
+            "content": ""
+        }]
+    window.current_note = 0
     editor.clear()
     editor.setPlainText(window.lock_screen)
     editor.setReadOnly(True)
     window.status_label.setText("Locked")
+    window.add_note_btn.setEnabled(False)
 
     lock_btn.hide()
     unlock_btn.setEnabled(True)
@@ -427,15 +466,15 @@ def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     window.autolock_timer.stop()
 
 def save_vault(window, editor, key):
-    vault_text = editor.toPlainText().strip()
-    if not vault_text:
-        QMessageBox.information(
-            window, "PassCore", "Empty editor, Nothing to save.!"
-        )
+    window.save_current_note()
+    current_note = window.notes[window.current_note]
+    if not current_note["content"].strip():
+        QMessageBox.information(window, "PassCore", "Empty vault.!\n\nNothing to save.")
         return
-    new_lines = editor.toPlainText().splitlines()
+    
     create_backup()
-    encrypt_vault(new_lines, key)
+    encrypt_vault(window.notes, key)
+    window.update_vault_size()
     timestamp = datetime.now().strftime("%I:%M:%S %p")
     window.save_label.setText(
         f"Last Save\n{timestamp}"
@@ -447,14 +486,19 @@ def vault_close(window, editor, key):
         window, "PassCore", "Save changes before closing the Vault.?", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
     )
     if reply == QMessageBox.Yes:
-        vault_text = editor.toPlainText().strip()
-        if not vault_text:
+        window.save_current_note()
+        non_empty_notes = sum(
+            1 for note in window.notes
+            if note["content"].strip()
+        )
+        if len(window.notes) == 1 and non_empty_notes == 0:
             QMessageBox.information(
-                window, "PassCore", "Empty editor, Nothing to save.!"
+                window, "PassCore", "Empty vault.!\nNothing to save."
             )
             return
-        new_lines = editor.toPlainText().splitlines()
-        encrypt_vault(new_lines, key)
+        
+        encrypt_vault(window.notes, key)
+        window.update_vault_size()
         window.close()
         print(f"{YELLOW}bye.!{RESET}")
     
@@ -481,6 +525,9 @@ def user_edit():
 
     autosave_timer = QTimer() # Autosave Timer 
     autosave_timer.setSingleShot(True) # Trigger autosave timer : True
+    window.note_title.textChanged.connect(
+        lambda: autosave_timer.start(60000)
+    )
     editor.textChanged.connect(
         lambda: autosave_timer.start(60000) # Set autosave timer for 60s(1 min) if changes appear in Editor.
     )

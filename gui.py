@@ -1,9 +1,9 @@
 import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem)
 from PySide6.QtGui import QAction, QIcon, QTextCursor
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
 from health import vault_health
@@ -18,7 +18,7 @@ class PassCoreUI(QMainWindow):
         self.setWindowIcon(
             QIcon("assets/PassCore.ico")
         )
-        self.resize(1100, 700)
+        self.resize(1300, 800)
         self.settings = load_settings()
         self.autolock_timer = QTimer()
         
@@ -63,36 +63,36 @@ class PassCoreUI(QMainWindow):
     def build_ui(self):
 
         # Main Window Theme
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #FFF8FA;
-                color: #202020;
+        self.setStyleSheet("""        
+            QWidget {
+                background-color: #0B1120;
+                color: #E5E7EB;
             }
             QMenuBar {
-                background: #FFF8FA;
-                color: #202020;
+                background-color: #111827;
+                color: #E5E7EB;
             }
             QMenuBar::item {
                 background: transparent;
-                color: #202020;
+                color: #E5E7EB;
                 padding: 6px 10px;
             }
             QMenuBar::item:selected {
-                background: #D8B8C4;
+                background-color: #D4AF37;
+                color: #111827;
                 border-radius: 4px;
             }
             QMenu {
-                background: #FFF8FA;
-                color: #202020;
-                border: 2px solid #D8B8C4;
+                background-color: #111827;
+                color: #E5E7EB;
+                border: 1px solid #374151;
             }
             QMenu::item {
                 padding: 6px 20px;
-                color: #202020;
             }
             QMenu::item:selected {
-                background: #D8B8C4;
-                color: #202020;
+                background-color: #D4AF37;
+                color: #111827;
             }
         """)
 
@@ -152,38 +152,129 @@ class PassCoreUI(QMainWindow):
 
         # ==================================================
         # Editor
+        self.note_title = QLineEdit()
+        self.note_title.setStyleSheet("""
+            QLineEdit {
+                background-color: #111827;
+                color: #f9fafb;
+                border: 1px solid #374151;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QLineEdit:focus {
+                border: 2px solid #14b8a6;
+            }
+        """)
+
+        self.note_title.setPlaceholderText("Note Title")
+
         self.editor = QTextEdit()
         self.editor.setPlaceholderText(
-            "Vault Unlocked.!\nDo Editing..."
+            "Vani says Fahfah fah fah faaaah"
         )
         self.editor.setReadOnly(True)
 
         self.editor.setStyleSheet("""
             QTextEdit {
-                background: #FFFFFF;
-                color: #202020;
-                border: 2px solid #D8B8C4;
-                border-radius: 8px;
-                padding: 8px;
+                background: #1A2233;
+                color: #E5E7EB;
+                border: 1px solid #374151;
+                border-radius: 10px;
+                padding: 10px;
                 font-family: "JetBrains Mono";
                 font-size: 12pt;
-                selection-background-color: #D8B8C4;
+                selection-background-color: #D4AF37;
                 selection-color: #202020;
             }
         """)
+        # Notes
+        self.current_note = 0
+        self.notes = [{
+            "title": "Untitled Note",
+            "content": ""
+        }]
 
-        root_layout.addWidget(self.editor, stretch=4)
+        # Left Panel for Notes
+        self.note_title.textChanged.connect(self.rename_note)
+        self.add_note_btn = QPushButton("+")
+        self.add_note_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1f2937;
+                color: white;
+                border: 1px solid #374151;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #374151;
+            }
+            QPushButton:pressed {
+                background-color: #4b5563;
+            }
+        """)
+        
+        self.note_list = QListWidget()
+        self.note_list.setStyleSheet("""
+            QListWidget {
+                background-color: #0B1120;
+                color: #e5e7eb;
+                border: 1px solid #1f2937;
+                border-radius: 8px;
+                padding: 4px;
+                outline: none;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QListWidget::item:hover {
+                background-color: #1f2937;
+            }
+            QListWidget::item:selected {
+                background-color: #d4af37;
+                color: #111827;
+            }
+        """)
+
+        self.note_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.note_list.customContextMenuRequested.connect(self.note_context_menu)
+
+        self.add_note_btn.clicked.connect(self.add_note)
+        self.note_list.addItem("Untitled Note")
+        self.note_list.currentRowChanged.connect(self.load_note)
+        self.note_list.setCurrentRow(0)
+
+        # Notes Layout
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(self.add_note_btn)
+        left_layout.addWidget(self.note_list)
+
+        right_layout = QVBoxLayout()
+        right_layout.addWidget(self.note_title)
+        right_layout.addWidget(self.editor)
+
+        main_layout = QHBoxLayout()
+        main_layout.addLayout(left_layout, 1)
+        main_layout.addLayout(right_layout, 4)
+
+        root_layout.addLayout(main_layout, stretch=4)
 
         # ==================================================
         # Sidebar
         sidebar = QFrame()
         sidebar.setFixedWidth(230)
-
         sidebar.setStyleSheet("""
             QFrame {
-                background: #FFECEF;
-                border: 2px solid #D8B8C4;
-                border-radius: 8px;
+                background-color: #0B1120;
+                border: 1px solid #1f2937;
+                border-radius: 10px;
+            }
+            QLabel {
+                color: #e5e7eb;
             }
         """)
         sidebar_layout = QVBoxLayout(sidebar)
@@ -191,11 +282,11 @@ class PassCoreUI(QMainWindow):
         # Common Label Style
         self.info_style = """
             QLabel {
-                background: #F7E6EA;
-                border: 2px solid #D8B8C4;
+                background-color: #111827;
+                border: 1px solid #374151;
                 border-radius: 8px;
-                padding: 6px;
-                color: #4A4A4A;
+                padding: 8px;
+                color: #E5E7EB;
                 font-size: 11pt;
             }
         """
@@ -216,8 +307,8 @@ class PassCoreUI(QMainWindow):
             QLabel {
                 border: none;
                 background: transparent;
-                color: #C0392B;
-                font-size: 15pt;
+                color: #D4AF37;
+                font-size: 18px;
                 font-weight: bold;
             }
         """)
@@ -346,15 +437,15 @@ class PassCoreUI(QMainWindow):
         self.lock_btn.setStyleSheet("""
             QPushButton {
                 background: #d9534f;
-                color: black;
-                border: 2px solid black;
+                background-color: #1f2937;
+                color: #d4af37;
+                border: 2px solid #374151;
                 border-radius: 8px;
-                padding: 8px;
+                padding: 10px;
                 font-weight: bold;
             }
-
             QPushButton:hover {
-                background: #e46b67;
+                background: #273549;
             }
         """)
 
@@ -378,15 +469,18 @@ class PassCoreUI(QMainWindow):
         self.save_btn.setStyleSheet("""
             QPushButton {
                 background: #7ea6e0;
-                color: black;
-                border: 2px solid black;
+                background-color: #d4af37;
+                color: #111827;
+                border: none;
                 border-radius: 8px;
-                padding: 8px;
+                padding: 10px;
                 font-weight: bold;
             }
-
             QPushButton:hover {
-                background: #92b5e7;
+                background: #e6c65c;
+            }
+            QPushButton:pressed {
+                background-color: #b8941f;
             }
         """)
 
@@ -394,15 +488,15 @@ class PassCoreUI(QMainWindow):
         self.close_btn.setStyleSheet("""
             QPushButton {
                 background: #d6d6d6;
-                color: black;
-                border: 2px solid black;
+                background-color: #374151;
+                color: white;
+                border: none;
                 border-radius: 8px;
-                padding: 8px;
+                padding: 10px;
                 font-weight: bold;
             }
-
             QPushButton:hover {
-                background: #e4e4e4;
+                background: #4b5563;
             }
         """)
 
@@ -419,6 +513,111 @@ class PassCoreUI(QMainWindow):
         sidebar_layout.addLayout(row_2)
 
         root_layout.addWidget(sidebar)
+
+    def add_note(self):
+        if self.current_note >= 0:
+            current = self.notes[self.current_note]
+
+        if not current["content"].strip():
+            QMessageBox.information(self, "PassCore", "Current note is empty.!")
+            return
+        
+        self.notes.append({
+            "title": "Untitled Note",
+            "content": ""
+        })
+        item = QListWidgetItem("Untitled note")
+        self.note_list.addItem(item)
+        self.note_list.setCurrentRow(self.note_list.count() - 1)
+
+    def rename_note(self):
+        if self.current_note < 0:
+            return
+        
+        title = self.note_title.text().strip()
+        if not title:
+            title = "Untitled Note"
+        
+        self.notes[self.current_note]["title"] = title
+
+        item = self.note_list.item(self.current_note)
+        if item:
+            item.setText(title)
+
+    def load_note(self, row): # Switch b/w notes already loaded into mem.
+        if row < 0:
+            return
+        
+        if self.current_note >= 0:
+            self.save_current_note()
+
+        self.current_note = row
+        note = self.notes[row]
+        self.note_title.setText(note["title"])
+        self.editor.setPlainText(note["content"])
+
+    def load_notes(self, notes): # Loads the entire vault for Decryption.
+        self.notes = notes
+        self.note_list.clear()
+
+        for note in notes:
+            self.note_list.addItem(note["title"])
+        
+        self.current_note = -1
+        self.note_list.setCurrentRow(0)
+
+    def save_current_note(self):
+        if not self.notes:
+            return
+        
+        if self.current_note < 0:
+            return
+
+        if self.current_note >= len(self.notes):
+            return
+        
+        note = self.notes[self.current_note]
+        note["title"] = self.note_title.text()
+        note["content"] = (self.editor.toPlainText())
+
+    def note_context_menu(self, pos):
+        item = self.note_list.itemAt(pos)
+        if not item:
+            return
+        
+        row = self.note_list.row(item)
+        menu = QMenu(self)
+
+        rename_action = menu.addAction("Rename")
+        delete_action = menu.addAction("Delete")
+
+        action = menu.exec(self.note_list.mapToGlobal(pos))
+        if action == rename_action:
+            self.note_list.setCurrentRow(row)
+            self.note_title.setFocus()
+
+        if action == delete_action:
+            reply = QMessageBox.question(
+                self, "PassCore Note", f"Are you sure?\n\nDelete: {self.notes[row]["title"]}", QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+            else:
+                self.delete_note(row)
+
+    def delete_note(self, row):
+        if self.notes[row]["title"] == "Locked":
+            return
+        
+        if len(self.notes) <= 1:
+            return
+
+        del self.notes[row]
+        self.note_list.takeItem(row)
+        
+        row = max(0, min(row, len(self.notes) - 1))
+        self.current_note = row
+        self.note_list.setCurrentRow(row)
 
     def show_vault_health(self):
         dialog = VaultHealthDialog()
@@ -616,6 +815,13 @@ class PassCoreUI(QMainWindow):
         self.save_btn.hide()
         self.close_btn.setEnabled(True)
 
+        self.note_list.clear()
+        self.note_title.clear()
+        self.notes = [{
+            "title": "Locked",
+            "content": ""
+        }]
+
         QMessageBox.information(self, "PassCore", "Import complete.\n\nUnlock the imported vault to continue.")
 
     def change_autolock_timer(self):
@@ -639,10 +845,17 @@ class PassCoreUI(QMainWindow):
         )            
 
 class PasswordDialog(QDialog):
-    def __init__(self, title="Unlock Vault", confirm=False):
+    def __init__(self, title="PassCore Vault", confirm=False):
         super().__init__()
         self.confirm = confirm
         self.setWindowTitle(title)
+        self.setWindowIcon(QIcon("assets/PassCore.png"))
+        self.setStyleSheet("""
+            background-color: #111827;
+            color: #E5E7EB;
+            border-bottom: 1px solid #374151;
+        """)
+
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
 
@@ -699,6 +912,43 @@ class PasswordGenerator(QDialog):
     def __init__(self, title="PassCore Password Generator"):
         super().__init__()
         self.setWindowTitle(title)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #0B1120;
+                color: #E5E7EB;
+            }
+            QLabel {
+                color: #E5E7EB;
+                font-size: 11pt;
+            }
+            QLineEdit {
+                background-color: #111827;
+                color: #E5E7EB;
+                border: 1px solid #374151;
+                border-radius: 8px;
+                padding: 8px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #D4AF37;
+            }
+            QCheckBox {
+                color: #E5E7EB;
+            }
+            QPushButton {
+                background-color: #1F2937;
+                color: #E5E7EB;
+                border: 1px solid #374151;
+                border-radius: 8px;
+                padding: 8px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #2B3648;
+            }
+            QPushButton:pressed {
+                background-color: #374151;
+            }
+        """)
         self.lenght_spin = QSpinBox()
         self.lenght_spin.setRange(8, 128)
         self.lenght_spin.setValue(19)
@@ -779,28 +1029,31 @@ class VaultHealthDialog(QDialog):
 
         self.setStyleSheet("""
             QDialog {
-                background-color: #FFF8FA;
+                background-color: #0B1120;
             }
             QFrame {
-                background: #FFFFFF;
-                border: 2px solid #D8B8C4;
+                background-color: #111827;
+                border: 1px solid #374151;
                 border-radius: 8px;
             }
             QLabel {
-                color: #202020;
+                color: #E5E7EB;
                 border: none;
                 background: transparent;
             }
             QPushButton {
-                background: #D8B8C4;
-                color: black;
-                border: 2px solid #B88FA0;
+                background-color: #D4AF37;
+                color: #111827;
+                border: none;
                 border-radius: 8px;
-                padding: 6px;
+                padding: 8px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background: #E3C6D1;
+                background-color: #E6C65C;
+            }
+            QPushButton:pressed {
+                background-color: #B8941F;
             }
         """)
 
@@ -822,6 +1075,7 @@ class VaultHealthDialog(QDialog):
             QLabel {
                 font-size: 16pt;
                 font-weight: bold;
+                color: #E5E7EB;
             }
         """)
 
@@ -837,7 +1091,7 @@ class VaultHealthDialog(QDialog):
             QLabel {
                 font-size: 13pt;
                 font-weight: bold;
-                color: #4A4A4A;
+                color: #D4AF37;
             }
         """)
 
@@ -854,6 +1108,7 @@ class VaultHealthDialog(QDialog):
             QLabel {
                 font-family: monospace;
                 font-size: 11pt;
+                color: #C9D1D9;
             }
         """)
         info_layout.addWidget(info_title)
@@ -871,7 +1126,7 @@ class VaultHealthDialog(QDialog):
             QLabel {
                 font-size: 13pt;
                 font-weight: bold;
-                color: #4A4A4A;
+                color: #D4AF37;
             }
         """)
 
@@ -883,7 +1138,6 @@ class VaultHealthDialog(QDialog):
             ("Blob Size", report["size"]),
             ("SHA256", report["sha256"])
         ]
-
         for name, passed in checks:
             status = (
                 "✓ PASS"

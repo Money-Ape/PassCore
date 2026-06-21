@@ -25,17 +25,26 @@ def import_txt(window):
             with open(file_path, "r") as read_imp:
                 imported_txt = read_imp.read()
             
+            note_title = Path(file_path).stem
             if reply == QMessageBox.Yes:
-                window.editor.setPlainText(imported_txt)
+                window.save_current_note()
+                window.notes = [{
+                    "title": note_title,
+                    "content": imported_txt
+                }]
+                window.note_list.clear()
+                window.note_list.addItem(note_title)
+                window.current_note = -1
+                window.note_list.setCurrentRow(0)
             
             else:
-                content_txt = window.editor.toPlainText()
-                if content_txt.strip():
-                    window.editor.setPlainText(
-                        content_txt.rstrip() + "\n" + imported_txt
-                    )
-                else:
-                    window.editor.setPlainText(imported_txt)
+                window.save_current_note()
+                window.notes.append({
+                    "title": note_title,
+                    "content": imported_txt
+                })
+                window.note_list.addItem(note_title)
+                window.note_list.setCurrentRow(len(window.notes) -1)
             
             QMessageBox.information(window, "PassCore", "Records imported successfully.!")
 
