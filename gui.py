@@ -19,7 +19,7 @@ class PassCoreUI(QMainWindow):
         self.setWindowIcon(
             QIcon("assets/PassCore.ico")
         )
-        self.resize(1300, 800)
+        self.resize(1250, 850)
         self.settings = load_settings()
         self.autolock_timer = QTimer()
         self.apply_themes()
@@ -222,7 +222,7 @@ class PassCoreUI(QMainWindow):
 
         self.editor = QTextEdit()
         self.editor.setPlaceholderText(
-            "Vani says Fahfah fah fah faaaah"
+            "Welcome to PassCore.!"
         )
         self.editor.setReadOnly(True)
 
@@ -588,7 +588,7 @@ class PassCoreUI(QMainWindow):
         
         self.notes.append({
             "title": "Untitled Note",
-            "content": ""
+            "content": "Welcome to PassCore.!\n\nMaintainer : Lovepreet Singh aka Money-Ape\n\n• Create notes\n• Store credentials\n• Import text files\n• Export PassCore vaults\n• Create encrypted backups\n\nYour data never leaves your device.\n\nThanks :)"
         })
         item = QListWidgetItem("Untitled note")
         self.note_list.addItem(item)
@@ -1238,10 +1238,10 @@ class VaultHealthDialog(QDialog):
 
         self.setStyleSheet(f"""
             QDialog {{
-                background-color: {self.w};
+                background-color: {self.win};
             }}
             QFrame {{
-                background-color: rgba(0, 0, 0, 40%);
+                background-color: {self.i};
                 border: 2px solid {self.b};
                 border-radius: 8px;
             }}
@@ -1302,7 +1302,7 @@ class VaultHealthDialog(QDialog):
             QLabel {{
                 font-size: 13pt;
                 font-weight: bold;
-                color: {self.i};
+                color: {self.t};
             }}
         """)
 
@@ -1315,12 +1315,12 @@ class VaultHealthDialog(QDialog):
             Backups : {report['backups']}
             """
         )
-        info_label.setStyleSheet("""
-            QLabel {
+        info_label.setStyleSheet(f"""
+            QLabel {{
                 font-family: monospace;
                 font-size: 11pt;
-                color: #C9D1D9;
-            }
+                color: {self.t};
+            }}
         """)
         info_layout.addWidget(info_title)
         info_layout.addWidget(info_label)
@@ -1356,9 +1356,9 @@ class VaultHealthDialog(QDialog):
                 else "✗ FAIL"
             )
             color = (
-                "#4CAF50"
+                self.t
                 if passed
-                else "#2E7D32"
+                else "#C62828"
             )
             label = QLabel(f"{name:<12} {status}")
             label.setStyleSheet(f"""

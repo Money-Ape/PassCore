@@ -361,6 +361,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             QMessageBox.information(
                 window, "PassCore", "Vault is empty.!"
             )
+            return
 
         try:
             try:
@@ -481,7 +482,7 @@ def save_vault(window, editor, key):
     )
     QMessageBox.information(None, "PassCore", "Vault saved successfully.!")
 
-def vault_close(window, editor, key):
+def vault_close(window, key):
     reply = QMessageBox.question(
         window, "PassCore", "Save changes before closing the Vault.?", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
     )
@@ -550,7 +551,7 @@ def user_edit():
     )
 
     close_btn.clicked.connect(
-        lambda: vault_close(window, editor, window.key))
+        lambda: vault_close(window, window.key))
     
     lock_btn.clicked.connect(
         lambda: vault_lock(window, editor, save_btn, unlock_btn, lock_btn)
