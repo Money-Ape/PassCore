@@ -1221,7 +1221,7 @@ class VaultHealthDialog(QDialog):
 
         if score == 100:
             health = "🟢 HEALTHY"
-            color = "#4CAF50"
+            color = "#2E7D32"
 
         elif score >= 80:
             health = "🟡 WARNING"
@@ -1236,7 +1236,7 @@ class VaultHealthDialog(QDialog):
                 background-color: {self.w};
             }}
             QFrame {{
-                background-color: {self.i};
+                background-color: rgba(0, 0, 0, 40%);
                 border: 2px solid {self.i};
                 border-radius: 8px;
             }}
@@ -1353,7 +1353,7 @@ class VaultHealthDialog(QDialog):
             color = (
                 "#4CAF50"
                 if passed
-                else "#E53935"
+                else "#2E7D32"
             )
             label = QLabel(f"{name:<12} {status}")
             label.setStyleSheet(f"""

@@ -1,86 +1,86 @@
 
 THEMES = {
-    "light_grey": {
-        "interactive": "#DADDE2",
-        "workspace": "#F4F6F8",
-        "text": "#2D3748"
+    "slate_grey": {
+        "interactive": "#4B5563",
+        "workspace": "#2D3748",
+        "text": "#F3F4F6"
     },
     "pale_green": {
-        "interactive": "#CFE8D5",
-        "workspace": "#EDF7F0",
-        "text": "#2D3A2F"
+        "interactive": "#4F6B57",
+        "workspace": "#2E3F33",
+        "text": "#EEF5EF"
     },
     "beige": {
-        "interactive": "#E7D7C9",
-        "workspace": "#F7F1EB",
-        "text": "#4A4036"
+        "interactive": "#6B5D4D",
+        "workspace": "#3F372F",
+        "text": "#F5F1E8"
     },
     "mint_green": {
-        "interactive": "#BEEADF",
-        "workspace": "#ECFAF5",
-        "text": "#27433C"
+        "interactive": "#2E4A44",
+        "workspace": "#1E2F2B",
+        "text": "#E8F5F1"
     },
     "sage_green": {
-        "interactive": "#B8C4B1",
-        "workspace": "#EAF0E7",
-        "text": "#364032"
+        "interactive": "#4A5D4E",
+        "workspace": "#2F3B31",
+        "text": "#F0F5EF"
     },
     "light_blue": {
-        "interactive": "#C8DCF0",
-        "workspace": "#EEF5FC",
-        "text": "#2B4259"
+        "interactive": "#4B6075",
+        "workspace": "#2D3E50",
+        "text": "#EEF4FA"
     },
     "blue_gray": {
-        "interactive": "#B8C2CC",
-        "workspace": "#E8EDF2",
-        "text": "#2F3A45"
+        "interactive": "#3A4756",
+        "workspace": "#252E38",
+        "text": "#EAEFF4"
     },
     "ivory": {
-        "interactive": "#F2EAD3",
-        "workspace": "#FFFDF7",
-        "text": "#4A463D"
+        "interactive": "#6A6457",
+        "workspace": "#3A3732",
+        "text": "#FFFDF7"
     },
     "cream_darkgrey": {
-        "interactive": "#E8DDC7",
-        "workspace": "#F8F5EF",
-        "text": "#2F3437"
+        "interactive": "#5C5348",
+        "workspace": "#2E2E2E",
+        "text": "#F5F1E8"
     },
     "sage_darkgrey": {
-        "interactive": "#B8C4B1",
-        "workspace": "#EAF0E7",
-        "text": "#2F3437"
+        "interactive": "#55635A",
+        "workspace": "#2F3437",
+        "text": "#EAF0E7"
     },
-    "blue_gray_black": {
-        "interactive": "#B8C2CC",
-        "workspace": "#E8EDF2",
-        "text": "#111111"
+   "blue_gray_black": {
+        "interactive": "#4A5568",
+        "workspace": "#1A1D21",
+        "text": "#F1F5F9"
     },
     "charcoal": {
-        "interactive": "#2D3748",
-        "workspace": "#1F2937",
+        "interactive": "#374151",
+        "workspace": "#111827",
         "text": "#F3F4F6"
     }
 }
 
 BUTTONS = {
     "save": {
-        "bg": "#4CAF50",
-        "hover": "#5CBF60",
-        "text": "#FFFFFF"
+        "bg": "#3F7A4F",
+        "hover": "#4B8A5C",
+        "text": "#F3F4F6"
     },
     "lock": {
-        "bg": "#FBC02D",
-        "hover": "#FFD54F",
-        "text": "#202020"
+        "bg": "#A8842D",
+        "hover": "#C19A3A",
+        "text": "#111827"
     },
     "unlock": {
-        "bg": "#2196F3",
-        "hover": "#42A5F5",
-        "text": "#FFFFFF"
+        "bg": "#355C7D",
+        "hover": "#426C92",
+        "text": "#F3F4F6"
     },
     "close": {
-        "bg": "#EF5350",
-        "hover": "#F0625F",
-        "text": "#FFFFFF"
+        "bg": "#8B3A3A",
+        "hover": "#A34848",
+        "text": "#F3F4F6"
     }
 }

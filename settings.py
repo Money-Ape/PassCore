@@ -17,7 +17,7 @@ SETTING_FILE =  PASSCORE_DIR / "settings.json"
 
 DEFAULT_SETTINGS = {
     "auto_lock_min": 5,
-    "theme": "light_grey",
+    "theme": "slate_grey",
     "storage_mode": "default"
 }
 
