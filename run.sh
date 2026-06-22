@@ -12,7 +12,7 @@ fi
 
 source venv/bin/activate
 
-python - << 'EOF'
+python3 - << 'EOF'
 import importlib, subprocess, sys
 
 modules = {

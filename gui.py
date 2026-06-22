@@ -22,6 +22,21 @@ class PassCoreUI(QMainWindow):
         self.resize(1250, 850)
         self.settings = load_settings()
         self.autolock_timer = QTimer()
+        self.WELCOME_TEXT = """
+            Welcome to PassCore.!
+
+            Maintainer : Lovepreet Singh aka Money-Ape
+
+            • Create notes
+            • Store credentials
+            • Import text files
+            • Export PassCore vaults
+            • Create encrypted backups
+
+            Your data never leaves your device.
+
+            Thanks :)
+        """.strip()
         self.apply_themes()
         self.build_ui()
         self.lock_screen = (
@@ -221,10 +236,26 @@ class PassCoreUI(QMainWindow):
         self.note_title.setPlaceholderText("Note Title")
 
         self.editor = QTextEdit()
-        self.editor.setPlaceholderText(
-            "Welcome to PassCore.!"
+
+        # Welcome GHost Message for Editor
+        self.welcome_label = QLabel(
+            self.WELCOME_TEXT, self.editor
         )
-        self.editor.setReadOnly(True)
+        self.welcome_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft
+        )
+        self.welcome_label.setWordWrap(True)
+        self.welcome_label.setStyleSheet(f"""
+            QLabel {{
+                color: {self.t};
+                background: transparent;
+                border: none;
+                font-size: 12pt;
+                padding: 30px;
+            }}
+        """)
+        self.welcome_label.setGeometry(self.editor.rect())
+        self.editor.textChanged.connect(self.update_welcome_label)
 
         self.editor.setStyleSheet(f"""
             QTextEdit {{
@@ -577,6 +608,12 @@ class PassCoreUI(QMainWindow):
         sidebar_layout.addLayout(row_2)
 
         root_layout.addWidget(sidebar)
+        self.update_welcome_label()
+
+    def update_welcome_label(self):
+        self.welcome_label.setVisible(
+            not self.editor.toPlainText().strip()
+        )
 
     def add_note(self):
         if self.current_note >= 0:
@@ -587,8 +624,8 @@ class PassCoreUI(QMainWindow):
             return
         
         self.notes.append({
-            "title": "Untitled Note",
-            "content": "Welcome to PassCore.!\n\nMaintainer : Lovepreet Singh aka Money-Ape\n\n• Create notes\n• Store credentials\n• Import text files\n• Export PassCore vaults\n• Create encrypted backups\n\nYour data never leaves your device.\n\nThanks :)"
+            "title": "Untitled note",
+            "content": ""
         })
         item = QListWidgetItem("Untitled note")
         self.note_list.addItem(item)
@@ -662,7 +699,7 @@ class PassCoreUI(QMainWindow):
 
         if action == delete_action:
             reply = QMessageBox.question(
-                self, "PassCore Note", f"Are you sure?\n\nDelete: {self.notes[row]["title"]}", QMessageBox.Yes | QMessageBox.No
+                self, "PassCore Note", f"Are you sure?\n\nDelete: {self.notes[row]['title']}", QMessageBox.Yes | QMessageBox.No
             )
             if reply != QMessageBox.Yes:
                 return
@@ -906,7 +943,7 @@ class PassCoreUI(QMainWindow):
         
         QMessageBox.information(
             self,"PassCore", f"Auto-Lock Timer set to {minutes} minute(s)."
-        )            
+        )
 
 class ThemeDialog(QDialog):
     def __init__(self, parent=None):

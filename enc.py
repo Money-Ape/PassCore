@@ -217,6 +217,7 @@ def deserialize_notes(data):
     return json.loads(data)
 
 def decrypt_vault(key, encrypted_blobs):
+    notes = []
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
     try:
         offset = 0
@@ -358,8 +359,50 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             )
             return
         if not has_blobs():
-            QMessageBox.information(
-                window, "PassCore", "Vault is empty.!"
+            if not window.notes:
+                QMessageBox.information(
+                    window,
+                    "PassCore",
+                    "Vault is empty.!"
+                )
+            dialog = PasswordDialog(title="Create Vault", confirm=True)
+            ok = dialog.exec()
+
+            if not ok:
+                window.close()
+                return
+            masterpasswd = dialog.password.text()
+
+            # Generates key for first run.!
+            key = hash_secret_raw(
+                secret=masterpasswd.encode(),
+                salt=salt, # Random values
+                time_cost=3, # No. of iterations
+                memory_cost=65536, # 64MB Argon memory hardness
+                parallelism=4, # No. of system threads/lanes
+                hash_len=32, # Output size, in bytes 32bytes = 256bits
+                type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
+            ) 
+            window.key = key
+            unlock_btn.hide()
+            editor.clear()
+            editor.setReadOnly(False)
+            window.notes = [{
+                "title": "Untitled Note",
+                "content": ""
+            }]
+            window.load_notes(window.notes)
+            lock_btn.setEnabled(True)
+            save_btn.setEnabled(True)
+            close_btn.setEnabled(True)
+            
+            window.status_label.setText("Unlocked")
+            window.add_note_btn.setEnabled(True)
+            window.note_title.setEnabled(True)
+
+            minutes = window.settings["auto_lock_min"]
+            window.autolock_timer.start(
+                minutes * 60 * 1000
             )
             return
 

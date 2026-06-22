@@ -4,12 +4,12 @@
 *.key
 *.salt
 
-packaging/linux/src
-packaging/linux/pkg
-packaging/linux/PassCore
-packaging/linux/*.pkg.tar.zst
+packaging/linux/passcore_x86_64/src
+packaging/linux/passcore_x86_64/pkg
+packaging/linux/passcore_x86_64/PassCore
+packaging/linux/passcore_x86_64/*.pkg.tar.zst
 packaging/linux/*.deb
-packaging/linux/passcore_0.4.0_amd64/usr/bin/passcore
+packaging/linux/passcore_0.4.1_amd64/usr/bin/passcore_amd64
 
 # Vscode
 .vscode
