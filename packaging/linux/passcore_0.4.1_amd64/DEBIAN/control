@@ -1,0 +1,10 @@
+Package: passcore
+Version: 0.4.1
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Lovepreet Singh <work.moneyapenetwork@gmail.com>
+Description: Secure offline password manager
+ PassCore is a privacy-focused password manager with local encrypted vault storage.
+ Uses AES-GCM encryption and Argon2id key derivation.
+ No cloud synchronization or external services are required.

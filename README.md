@@ -5,12 +5,12 @@
 </p>
 
 <p align="center">
-  Distributed Blob Storage • Integrity Verification • Secure Vault Management
+  Offline-First • Distributed Blob Storage • Integrity Verification • Secure Vault Management
 </p>
 
-A cryptographic password manager written in Python, focused on secure vault storage, authenticated encryption, and master-password-based access control.
+PassCore is a desktop password manager written in Python that focuses on local-first storage, authenticated encryption, vault integrity verification, and master-password-based access control.
 
-> **Project Status:** Alpha Pre-release (v0.3.5-alpha)
+> **Project Status:** Alpha Release (v0.4.1)
 
 ---
 
@@ -30,9 +30,14 @@ A cryptographic password manager written in Python, focused on secure vault stor
 * Memory-only vault reconstruction and editing workflow
 * Integrated vault health diagnostics and integrity reporting
 * Integrated record search with match navigation and Ctrl+F support
-* Built-in cryptographically secure password generator
 * Import TXT records and import/export PassCore Vaults (.pcv)
 * Vault size tracking, timestamps, and cross-platform storage layouts
+* Runtime theme engine with live theme switching
+* 13 built-in themes
+* Theme persistence via settings system
+* Placeholder-style welcome screen for empty vaults
+* Debian package support (.deb)
+* Arch Linux package support (PKGBUILD)
 * PySide6 desktop interface with integrated backup and management tools
 ---
 
@@ -157,6 +162,35 @@ Access:
 Edit
 └── Search
 ```
+---
+
+## Theme System
+
+PassCore includes a runtime theme engine with live theme switching.
+
+Available themes:
+
+* Slate Grey
+* Pale Green
+* Beige
+* Mint Green
+* Sage Green
+* Light Blue
+* Blue Grey
+* Ivory
+* Cream Dark Grey
+* Sage Dark Grey
+* Blue Grey Black
+* Charcoal
+* Default
+
+Themes can be changed from:
+
+```text
+Settings
+└── Themes
+```
+
 ---
 
 ### Health Verification Workflow
@@ -437,6 +471,8 @@ Backup retention automatically removes older backups after the configured limit 
 * Health scoring, integrity verification, and backup reporting
 * Backend-integrated vault editing workflow
 * Record search dashboard with match navigation
+* Theme management dialog
+* Placeholder-style welcome screen
 
 ---
 
@@ -485,15 +521,15 @@ Backup retention automatically removes older backups after the configured limit 
 * [x] Memory-only vault processing
 * [x] Vault health diagnostics
 * [x] Record search and navigation
-* [ ] Cross-platform packaging
+* [x] Debian Package Support
+* [x] Arch Linux Package Support
 
 ---
 
 ## Platform Support
 
-| Platform           | Status   |
-| ------------------ | -------- |
-| Linux (Arch Linux) | ✅ Tested |
+| Arch Linux         | ✅ Tested |
+| Ubuntu             | ✅ Tested |
 | Windows 10         | ✅ Tested |
 | Windows 11         | ✅ Tested |
 
@@ -516,6 +552,18 @@ Backup retention automatically removes older backups after the configured limit 
 
 ## Installation
 
+## Packages
+### Debian
+```bash
+sudo dpkg -i passcore_0.4.1_amd64.deb
+```
+
+## Arch Linux
+```bash
+sudo pacman -U passcore_0.4.1_x86_64.pkg.tar.zst
+```
+
+## Git Repo :
 ### Linux
 
 ```bash

@@ -75,51 +75,128 @@ RAM2 --> DEC
 DEC --> EDITOR
 
 %% ==========================================================
-%% STORAGE LOCATIONS
+%% UI LAYER
 %% ==========================================================
 
-SYS["Storage Locations"]
-
-BR --> SYS
-
-SYS --> LINUX
-SYS --> WINDOWS
-
-subgraph LINUX["Linux Storage Layout"]
-    LNX["XDG-Compliant Storage"]
-end
-
-subgraph WINDOWS["Windows Storage Layout"]
-    WIN["Windows Storage Layout"]
-end
+EDITOR --> THEME
+THEME["Theme Engine"]
+THEME --> UI["PassCore UI"]
 
 %% ==========================================================
-%% RECOVERY FLOW
+%% BACKUP SYSTEM
 %% ==========================================================
 
-subgraph RECOVERY["Recovery Flow (Backup Restore)"]
+BACKUP["Backup System"]
 
-R1["Restore Backup"]
-R2["Extract Backup"]
-R3["Restore Metadata"]
-R4["Restore Containers"]
-R5["Integrity Verification"]
-R6["Vault Unlock"]
-
-R1 --> R2
-R2 --> R3
-R3 --> R4
-R4 --> R5
-R5 --> R6
-
-end
+BR --> BACKUP
+BACKUP --> ZIP["ZIP Archive"]
+ZIP --> RETENTION["Backup Retention"]
 ```
 
 ---
 
-# In-Memory Vault Processing
+# Encryption Workflow
 
-PassCore reconstructs encrypted vault data directly in memory.
+```text
+Master Password
+        ↓
+      Salt
+        ↓
+    Argon2id
+        ↓
+256-bit Vault Key
+        ↓
+     AES-GCM
+        ↓
+ Encrypted Vault Data
+```
+
+PassCore derives encryption keys from a user-supplied master password using Argon2id.
+
+The derived key is used with AES-GCM authenticated encryption.
+
+---
+
+# Distributed Blob Storage
+
+PassCore stores encrypted vault data inside distributed container directories.
+
+Example:
+
+```text
+.passcore_db/
+
+├── a76f1d9a4cd6493d/
+│   └── blob_0000.bin
+
+├── b371b06d00374fb6/
+│   └── blob_0001.bin
+
+├── e2e0f4c1dd31483c/
+│   └── blob_0002.bin
+```
+
+Each blob receives:
+
+* Container ID
+* File Size
+* SHA256 Hash
+
+Metadata is recorded inside:
+
+```text
+meta.json
+```
+
+---
+
+# Integrity Verification
+
+Before vault reconstruction, PassCore validates:
+
+* Metadata
+* Containers
+* Blob existence
+* Blob size
+* SHA256 hashes
+
+Workflow:
+
+```text
+meta.json
+      ↓
+Verify Metadata
+      ↓
+Verify Container
+      ↓
+Verify Blob Existence
+      ↓
+Verify Blob Size
+      ↓
+Verify SHA256
+      ↓
+Vault Reconstruction
+```
+
+This allows PassCore to distinguish between:
+
+```text
+Wrong Password
+```
+
+and
+
+```text
+Vault Corruption
+```
+
+before decryption occurs.
+
+---
+
+# In-Memory Processing
+
+PassCore processes vault data entirely in memory.
 
 ```text
 Encrypted Containers
@@ -132,13 +209,13 @@ Encrypted Bytes (RAM)
         ↓
 AES-GCM Decryption
         ↓
-   Vault Editor
+Vault Editor
         ↓
 AES-GCM Encryption
         ↓
 Encrypted Bytes (RAM)
         ↓
-  Blob Splitting
+Blob Splitting
         ↓
 Encrypted Containers
 ```
@@ -147,7 +224,73 @@ No temporary vault files are created during normal operation.
 
 ---
 
-# Linux Storage Layout
+# Backup Architecture
+
+Backups contain:
+
+* vault.salt
+* meta.json
+* encrypted containers
+
+Workflow:
+
+```text
+Create Backup
+      ↓
+ZIP Archive
+      ↓
+Backup Retention Check
+      ↓
+Store Backup
+```
+
+Recovery:
+
+```text
+Restore Backup
+      ↓
+Extract Archive
+      ↓
+Restore Metadata
+      ↓
+Restore Containers
+      ↓
+Integrity Verification
+      ↓
+Vault Unlock
+```
+
+---
+
+# Theme Engine
+
+PassCore includes a runtime theme engine.
+
+Theme settings are stored in:
+
+```text
+settings.json
+```
+
+Workflow:
+
+```text
+Select Theme
+      ↓
+Save Settings
+      ↓
+refresh_theme()
+      ↓
+Apply UI Styles
+```
+
+Theme changes are applied immediately without restarting the application.
+
+---
+
+# Storage Layout
+
+## Linux
 
 ```text
 ~/.local/share/passcore/
@@ -159,9 +302,7 @@ No temporary vault files are created during normal operation.
 │   └── blob_*.bin
 ```
 
----
-
-# Windows Storage Layout
+## Windows
 
 ```text
 %APPDATA%\PassCore\
@@ -175,60 +316,42 @@ No temporary vault files are created during normal operation.
 
 ---
 
-# Integrity Verification Flow
+# Packaging
+
+## Debian
 
 ```text
-    meta.json
-        ↓
- Verify Metadata
-        ↓
- Verify Container
-        ↓
-Verify Blob Existence
-        ↓
-  Verify Blob Size
-        ↓
-  Verify SHA256
-        ↓
-Blob Reconstruction
-        ↓
-AES-GCM Decryption
-        ↓
-   Vault Unlock
+/usr/bin/passcore_amd64
+/usr/share/applications/passcore.desktop
+/usr/share/pixmaps/passcore.png
+```
+
+## Arch Linux
+
+```text
+/usr/bin/passcore
+/usr/share/applications/passcore.desktop
+/usr/share/pixmaps/passcore.png
 ```
 
 ---
 
-# Recovery Flow
+# Architecture Layers
 
 ```text
-Restore Backup
-      ↓
-Extract Backup
-      ↓
-Restore Metadata
-      ↓
-Restore Containers
-      ↓
-Integrity Verification
-      ↓
- Vault Unlock
-```
-
----
-
-# Storage Architecture Overview
-
-```text
+User Interface Layer
+        ↓
+Theme Layer
+        ↓
+Vault Editor Layer
+        ↓
+Cryptography Layer
+        ↓
 Storage Layer
-      ↓
-Metadata Layer
-      ↓
+        ↓
 Integrity Layer
-      ↓
-Recovery Layer
+        ↓
+Backup Layer
 ```
 
-PassCore stores encrypted vault data inside distributed container directories. Metadata tracks container mappings, blob sizes, and SHA256 integrity hashes. Before reconstruction, all blobs are validated against recorded metadata to detect corruption or tampering.
-
-Vault data is reconstructed directly in memory and decrypted only after successful integrity verification. This architecture avoids temporary vault files and reduces the risk of residual vault data remaining on disk after crashes or unexpected termination.
+PassCore separates storage, integrity verification, encryption, backups, and user interaction into independent layers to simplify future development and maintenance.

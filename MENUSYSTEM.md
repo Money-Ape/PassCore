@@ -2,34 +2,36 @@
 
 ## Overview
 
-PassCore provides a desktop interface built with PySide6 that integrates vault management, backup operations, diagnostics, password generation, search, and configuration tools.
+PassCore provides a desktop interface built with PySide6 integrating vault management, diagnostics, backups, import/export tools, password generation, search, and theme management.
 
 ---
 
 # File Menu
-![File Menu](assets/PassCoreUI_file-menu.png)
 
 ## Import Text File
 
-Allows importing plaintext credentials directly into the vault editor.
+Allows importing plaintext records into the current vault.
 
 Workflow:
+
 ```text
 Import TXT
-    ↓
-Replace Existing Records
-    OR
-Append Records
-    ↓
+      ↓
+Replace Existing Notes
+      OR
+Append Notes
+      ↓
 Vault Editor
 ```
+
 ---
 
 ## Import PassCore Vault (.pcv)
 
-Imports an encrypted PassCore vault archive.
+Imports a previously exported PassCore vault.
 
 Workflow:
+
 ```text
 Select Vault
       ↓
@@ -41,15 +43,16 @@ Restore Containers
       ↓
 Lock Imported Vault
       ↓
-Unlock Imported Vault
+Unlock Vault
 ```
+
 ---
 
 ## Export PassCore Vault (.pcv)
 
-Creates a portable encrypted vault archive.
+Creates a portable encrypted PassCore vault archive.
 
-Exported Contents:
+Archive Contents:
 
 * vault.salt
 * meta.json
@@ -58,12 +61,20 @@ Exported Contents:
 ---
 
 ## Settings
-![File Submenu](assets/PassCoreUI_file-settings01.png)
-### Auto-Lock Timer
+
+```text
+Settings
+├── Auto Lock
+└── Themes
+```
+
+---
+
+### Auto Lock
 
 Configure automatic vault locking after inactivity.
 
-Range:
+Available:
 
 * 1 minute
 * 5 minutes
@@ -73,21 +84,60 @@ Range:
 
 ---
 
+### Themes
+
+PassCore includes 13 built-in themes.
+
+Available Themes:
+
+* Default
+* Slate Grey
+* Pale Green
+* Beige
+* Mint Green
+* Sage Green
+* Light Blue
+* Blue Grey
+* Ivory
+* Cream Dark Grey
+* Sage Dark Grey
+* Blue Grey Black
+* Charcoal
+
+Theme changes apply instantly.
+
+Workflow:
+
+```text
+Open Theme Dialog
+      ↓
+Select Theme
+      ↓
+Apply Theme
+      ↓
+refresh_theme()
+      ↓
+Updated Interface
+```
+
+---
+
 # Edit Menu
-![Edit Menu](assets/PassCoreUI_edit-menu.png)
+
 ## Search Records
 
-Search records stored inside the vault editor.
+Search records stored in the vault.
 
 Features:
 
 * Ctrl + F shortcut
-* Case-insensitive matching
+* Match highlighting
+* Previous / Next navigation
 * Match counter
-* Previous/Next navigation
-* Editor focus tracking
+* Case-insensitive search
 
 Workflow:
+
 ```text
 Enter Search Term
         ↓
@@ -95,37 +145,46 @@ Locate Matches
         ↓
 Navigate Results
 ```
+
 ---
 
 # Tools Menu
-![Tools Menu](assets/PassCoreUI_tools-menu.png)
+
 ## Password Generator
 
 Generate cryptographically secure passwords.
 
+Features:
+
+* Configurable length
+* Uppercase letters
+* Lowercase letters
+* Numbers
+* Symbols
+
 Access:
+
 ```text
 Tools
 └── Password Generator
 ```
+
 ---
 
-## Vault Health Diagnostics
+## Vault Health
 
-PassCore includes an integrated Vault Health Diagnostics system that provides visibility into vault integrity, storage status, and backup availability.
+Vault Health provides diagnostics and integrity reporting.
 
-![Vault Health](assets/PassCoreUI_vault_health.png)
+Reports:
 
-The diagnostics dashboard reports:
-
-* Vault health score
-* Metadata validation status
-* Container verification status
-* Blob existence verification
-* Blob size verification
-* SHA256 integrity verification
-* Backup availability
-* Vault statistics and storage information
+* Vault Health Score
+* Metadata Status
+* Container Status
+* Blob Status
+* Blob Size Status
+* SHA256 Verification
+* Backup Availability
+* Vault Statistics
 
 Access:
 
@@ -133,11 +192,13 @@ Access:
 Tools
 └── Vault Health
 ```
+
 ---
 
 # Vault Operations
 
 ## Unlock Vault
+
 ```text
 Master Password
       ↓
@@ -147,23 +208,27 @@ Integrity Verification
       ↓
 Vault Reconstruction
       ↓
-Editor Access
+Vault Editor
 ```
+
 ---
 
 ## Lock Vault
+
 ```text
-User Lock Request
+Lock Request
       ↓
-Editor Hidden
+Remove Key From Memory
       ↓
-Key Removed From Memory
+Display Lock Screen
       ↓
 Vault Locked
 ```
+
 ---
 
-## Auto-Lock
+## Auto Lock
+
 ```text
 User Inactive
       ↓
@@ -171,33 +236,112 @@ Timer Expired
       ↓
 Vault Locked
 ```
+
 ---
 
 ## Autosave
+
 ```text
 Editor Modified
       ↓
-60 Second Delay
+Autosave Delay
       ↓
-Automatic Save
+Save Vault
       ↓
-Backup Creation
+Create Backup
 ```
+
+---
+
+# Welcome Screen
+
+PassCore displays a placeholder-style welcome screen when notes are empty.
+
+Features:
+
+* Not stored inside vault data
+* Not encrypted
+* Not saved
+* Automatically hides when user starts typing
+* Reappears when editor becomes empty
+
+Workflow:
+
+```text
+Empty Note
+      ↓
+Show Welcome Screen
+      ↓
+User Types
+      ↓
+Hide Welcome Screen
+```
+
 ---
 
 # Current Interface Features
 
 * Vault Lock / Unlock
-* Auto-Lock Timer
+* Auto Lock Timer
 * Autosave
 * Save Tracking
 * Vault Size Tracking
+* Created / Modified Tracking
 * Vault Status Monitoring
 * Search Records
 * Password Generator
 * Vault Health Diagnostics
+* Theme Manager
 * Backup Management
 * Import TXT
 * Import PCV
 * Export PCV
 * Settings System
+* Welcome Screen
+* Live Theme Switching
+
+---
+
+# Keyboard Shortcuts
+
+| Shortcut | Action         |
+| -------- | -------------- |
+| Ctrl + F | Search Records |
+| Ctrl + S | Save Vault     |
+| Ctrl + L | Lock Vault     |
+
+---
+
+# User Interface Components
+
+## Sidebar
+
+* Note Management
+* Search Navigation
+* Vault Statistics
+
+## Editor
+
+* Multi-note editing
+* Autosave integration
+* Welcome screen overlay
+
+## Status Area
+
+Displays:
+
+* Vault Status
+* Last Save Time
+* Vault Size
+
+## Dialogs
+
+* Password Dialog
+* Theme Dialog
+* Password Generator
+* Vault Health
+* Search Interface
+
+---
+
+PassCore's interface is designed to provide quick access to vault operations while maintaining a simple and secure workflow.
