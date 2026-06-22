@@ -64,8 +64,10 @@ class PassCoreUI(QMainWindow):
     def apply_themes(self):
         theme = THEMES[self.settings["theme"]]
 
-        self.i = theme["interactive"]
+        self.win = theme["window"]
         self.w = theme["workspace"]
+        self.i = theme["interactive"]
+        self.b = theme["border"]
         self.t = theme["text"]
 
         self.lock_theme = BUTTONS["lock"]
@@ -108,11 +110,11 @@ class PassCoreUI(QMainWindow):
         # Main Window Theme
         self.setStyleSheet(f"""
             QWidget {{
-                background-color: {self.w};
+                background-color: {self.win};
                 color: {self.t};
             }}
             QMenuBar {{
-                background-color: {self.w};
+                background-color: {self.win};
                 color: {self.t};
                 border: ;
             }}
@@ -127,9 +129,9 @@ class PassCoreUI(QMainWindow):
                 border-radius: 4px;
             }}
             QMenu {{
-                background-color: {self.w};
+                background-color: {self.win};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
             }}
             QMenu::item {{
                 padding: 6px 20px;
@@ -205,7 +207,7 @@ class PassCoreUI(QMainWindow):
             QLineEdit {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 8px;
                 font-size: 14px;
@@ -228,7 +230,7 @@ class PassCoreUI(QMainWindow):
             QTextEdit {{
                 background-color: {self.w};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 10px;
                 padding: 10px;
                 font-family: "JetBrains Mono";
@@ -272,7 +274,7 @@ class PassCoreUI(QMainWindow):
             QPushButton {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 8px;
                 font-size: 16px;
@@ -280,7 +282,7 @@ class PassCoreUI(QMainWindow):
             }}
             QPushButton:hover {{
                 background-color: {self.w};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
             }}
             QPushButton:pressed {{
                 background-color: {self.i};
@@ -292,7 +294,7 @@ class PassCoreUI(QMainWindow):
             QListWidget {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 4px;
                 outline: none;
@@ -342,7 +344,7 @@ class PassCoreUI(QMainWindow):
         sidebar.setStyleSheet(f"""
             QFrame {{
                 background-color: {self.w};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 10px;
             }}
             QLabel {{
@@ -357,7 +359,7 @@ class PassCoreUI(QMainWindow):
         self.info_style = f"""
             QLabel {{
                 background-color: {self.w};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 8px;
                 color: {self.t};
@@ -408,7 +410,7 @@ class PassCoreUI(QMainWindow):
             QLabel {{
                 background-color: {self.i};
                 color: #E53935;
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 4px;
                 font-weight: bold;
@@ -420,14 +422,14 @@ class PassCoreUI(QMainWindow):
             QPushButton {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 font-weight: bold;
                 font-size: 12pt;
             }}
             QPushButton:hover {{
                 background-color: {self.w};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
             }}
             QPushButton:pressed {{
                 background-color: {self.t};
@@ -455,7 +457,7 @@ class PassCoreUI(QMainWindow):
             QLineEdit {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 6px;
             }}
@@ -921,8 +923,10 @@ class ThemeDialog(QDialog):
         )
 
         theme = THEMES[current_theme]
-        i = theme["interactive"]
+        win = theme["window"]
         w = theme["workspace"]
+        i = theme["interactive"]
+        b = theme["border"]
         t = theme["text"]
 
         self.setStyleSheet(f"""
@@ -1004,7 +1008,7 @@ class PasswordDialog(QDialog):
             QLineEdit {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 8px;
             }}
@@ -1052,8 +1056,10 @@ class PasswordDialog(QDialog):
     def apply_themes(self):
         theme = THEMES[self.settings["theme"]]
 
-        self.i = theme["interactive"]
+        self.win = theme["window"]
         self.w = theme["workspace"]
+        self.i = theme["interactive"]
+        self.b = theme["border"]
         self.t = theme["text"]
 
         self.lock_theme = BUTTONS["lock"]
@@ -1105,7 +1111,7 @@ class PasswordGenerator(QDialog):
             QLineEdit {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 8px;
             }}
@@ -1119,14 +1125,14 @@ class PasswordGenerator(QDialog):
             QPushButton {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 8px;
                 min-width: 80px;
             }}
             QPushButton:hover {{
                 background-color: {self.w};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
             }}
             QPushButton:pressed {{
                 background-color: {self.t};
@@ -1183,8 +1189,10 @@ class PasswordGenerator(QDialog):
     def apply_themes(self):
         theme = THEMES[self.settings["theme"]]
 
-        self.i = theme["interactive"]
+        self.win = theme["window"]
         self.w = theme["workspace"]
+        self.i = theme["interactive"]
+        self.b = theme["border"]
         self.t = theme["text"]
 
         self.lock_theme = BUTTONS["lock"]
@@ -1237,7 +1245,7 @@ class VaultHealthDialog(QDialog):
             }}
             QFrame {{
                 background-color: rgba(0, 0, 0, 40%);
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
             }}
             QLabel {{
@@ -1248,14 +1256,14 @@ class VaultHealthDialog(QDialog):
             QPushButton {{
                 background-color: {self.i};
                 color: {self.t};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 8px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
                 background-color: {self.w};
-                border: 2px solid {self.i};
+                border: 2px solid {self.b};
             }}
             QPushButton:pressed {{
                 background-color: {self.t};
@@ -1389,8 +1397,10 @@ class VaultHealthDialog(QDialog):
     def apply_themes(self):
         theme = THEMES[self.settings["theme"]]
 
-        self.i = theme["interactive"]
+        self.win = theme["window"]
         self.w = theme["workspace"]
+        self.i = theme["interactive"]
+        self.b = theme["border"]
         self.t = theme["text"]
 
         self.lock_theme = BUTTONS["lock"]
