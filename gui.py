@@ -509,7 +509,7 @@ class PassCoreUI(QMainWindow):
             QPushButton {{
                 background-color: {self.lock_theme["bg"]};
                 color: {self.lock_theme["text"]};
-                border: none;
+                border: 2px solid {self.b} ;
                 border-radius: 8px;
                 padding: 10px;
                 font-weight: bold;
@@ -524,7 +524,7 @@ class PassCoreUI(QMainWindow):
             QPushButton {{
                 background-color: {self.unlock_theme["bg"]};
                 color: {self.unlock_theme["text"]};
-                border: none;
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 10px;
                 font-weight: bold;
@@ -539,7 +539,7 @@ class PassCoreUI(QMainWindow):
             QPushButton {{
                 background-color: {self.save_theme["bg"]};
                 color: {self.save_theme["text"]};
-                border: none;
+                border: 2px solid {self.b};
                 border-radius: 8px;
                 padding: 10px;
                 font-weight: bold;
@@ -554,14 +554,11 @@ class PassCoreUI(QMainWindow):
             QPushButton {{
                 background-color: {self.close_theme["bg"]};
                 color: {self.close_theme["text"]};
-
-                border: none;
+                border: 2px solid {self.b};
                 border-radius: 8px;
-
                 padding: 10px;
                 font-weight: bold;
             }}
-
             QPushButton:hover {{
                 background-color: {self.close_theme["hover"]};
             }}
