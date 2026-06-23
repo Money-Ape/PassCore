@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=PassCore
 Comment=Secure Password Manager
-Exec=passcore_amd64
+Exec=passcore
 Icon=passcore
 Terminal=false
 Type=Application
