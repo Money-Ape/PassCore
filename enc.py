@@ -358,20 +358,15 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 window, "PassCore vault", "vault data is missing or corrupted.!"
             )
             return
-        if not has_blobs():
-            if not window.notes:
-                QMessageBox.information(
-                    window,
-                    "PassCore",
-                    "Vault is empty.!"
-                )
-            dialog = PasswordDialog(title="Create Vault", confirm=True)
+        if not has_blobs(): # Open Empty editor to prevent integrity checks with no blobs.!
+            dialog = PasswordDialog(title="Create Vault", confirm=False)
             ok = dialog.exec()
-
             if not ok:
                 window.close()
                 return
+
             masterpasswd = dialog.password.text()
+            QMessageBox.information(window, "PassCore Vault", "vault is empty.!")
 
             # Generates key for first run.!
             key = hash_secret_raw(

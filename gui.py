@@ -1068,7 +1068,7 @@ class PasswordDialog(QDialog):
 
         self.show_pass.toggled.connect(self.toggle_password)
         self.unlock_btn.clicked.connect(self.validate_passwd)
-        self.cancel_btn.clicked.connect(self.reject)
+        self.cancel_btn.clicked.connect(quit)
 
         layout = QVBoxLayout()
         layout.addWidget(QLabel("Master Password")) # Master Password Dialog
