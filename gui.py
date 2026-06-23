@@ -24,6 +24,7 @@ class PassCoreUI(QMainWindow):
         self.autolock_timer = QTimer()
         self.WELCOME_TEXT = """
             Welcome to PassCore.!
+            x86_64bit : 0.4.1_alpha
 
             Maintainer : Lovepreet Singh aka Money-Ape
 
@@ -1068,7 +1069,7 @@ class PasswordDialog(QDialog):
 
         self.show_pass.toggled.connect(self.toggle_password)
         self.unlock_btn.clicked.connect(self.validate_passwd)
-        self.cancel_btn.clicked.connect(quit)
+        self.cancel_btn.clicked.connect(self.reject)
 
         layout = QVBoxLayout()
         layout.addWidget(QLabel("Master Password")) # Master Password Dialog
@@ -1118,13 +1119,24 @@ class PasswordDialog(QDialog):
             self.confirm_password.setEchoMode(mode)
 
     def validate_passwd(self):
+        password = self.password.text().strip()
+        if not password:
+            QMessageBox.warning(
+                self, "PassCore", "You forgot to type the password.!!\n\nMaster Password cannot be empty."
+            )
+            return
+        
         if self.confirm:
             if (self.password.text() != self.confirm_password.text()):
                 QMessageBox.warning(
-                    self, "PassCore", "Your Password doesn't match with your vault password...\nDon't play with passwrrd passwrod password*"
+                    self, "PassCore", "Password do not match.!\nPlease enter correct password... if you remember.! :_)*"
                 )
                 return
         self.accept()
+
+    def closeEvent(self, event):
+        self.reject()
+        event.accept()
 
 class PasswordGenerator(QDialog):
     def __init__(self, title="PassCore Password Generator"):

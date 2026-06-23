@@ -1,6 +1,6 @@
 from gui import PassCoreUI, PasswordDialog
 from backup import create_backup, secure_del_tree
-import os, struct, json, platform, hashlib, uuid
+import os, struct, json, platform, hashlib, uuid, base64
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -185,16 +185,19 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
     print("================================================")
     
     with open(META_FILE, "r") as old_meta:
-        created_at = json.load(old_meta)
+        compared = json.load(old_meta)
         old_ctn = {
             info["container"]
-            for info in created_at["blobs"].values()
+            for info in compared["blobs"].values()
         }
 
     vault_meta = {
         "storage_path": str(CONTAINER_DIR),
-        "created": created_at["created"],
+        "created": compared["created"],
         "modified": timestamp,
+        "auth_nonce": compared["auth_nonce"],
+        "auth_blob": compared["auth_blob"],
+        "verifier_hash": compared["verifier_hash"],
         "total_size": total_size,
         "blob_count": len(blob_data),
         "blobs": blob_data
@@ -217,7 +220,6 @@ def deserialize_notes(data):
     return json.loads(data)
 
 def decrypt_vault(key, encrypted_blobs):
-    notes = []
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
     try:
         offset = 0
@@ -233,12 +235,10 @@ def decrypt_vault(key, encrypted_blobs):
             nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
             decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
             payload = decrypt_enc_d.decode()
-            notes = json.loads(payload)
+            return json.loads(payload)
                 
     except FileNotFoundError as e1:
-        print(f"{RED}Error: {RESET}", e1)
-    
-    return notes
+        return InvalidTag("Unable to decrypt the vault.!")
 
 def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):    
     reply = QMessageBox.question(
@@ -281,23 +281,6 @@ def has_blobs():
 
     return len(read_meta.get("blobs", {})) > 0
 
-def init_vault():
-    vault_meta = {}
-    timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
-    blob_data = {}
-    total_size = 0
-    vault_meta = {
-        "storage_path": str(CONTAINER_DIR),
-        "created": timestamp,
-        "modified": timestamp,
-        "total_size": total_size,
-        "blob_count": len(blob_data),
-        "blobs": blob_data
-        }
-    
-    with open(META_FILE, "w") as meta_f:
-        json.dump(vault_meta, meta_f, indent=4)
-
 def vault_exists():
     
     if not SALT_FILE.exists():
@@ -311,13 +294,16 @@ def vault_exists():
 def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
     while True:
         if is_first_run():            
-            init_vault()
+            vault_meta = {}
+            timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
+            total_size = 0
+            blob_data = {}
+
             dialog = PasswordDialog(title="Create Vault", confirm=True)
             ok = dialog.exec()
-
             if not ok:
-                window.close()
-                return
+                raise SystemExit
+            
             masterpasswd = dialog.password.text()
             
             # Generates key for first run.!
@@ -329,7 +315,26 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 parallelism=4, # No. of system threads/lanes
                 hash_len=32, # Output size, in bytes 32bytes = 256bits
                 type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
-            ) 
+            )
+            auth_nonce = os.urandom(12)
+            verifier = os.urandom(32)
+            auth_blob = AESGCM(key).encrypt(auth_nonce, verifier, None)
+            vault_meta = {
+                "storage_path": str(CONTAINER_DIR),
+                "created": timestamp,
+                "modified": timestamp,
+                "auth_nonce": base64.b64encode(auth_nonce).decode(),
+                "auth_blob": base64.b64encode(auth_blob).decode(),
+                "verifier_hash": hashlib.sha256(verifier).hexdigest(),
+                "total_size": total_size,
+                "blob_count": len(blob_data),
+                "blobs": blob_data
+                }
+            print(vault_meta["auth_nonce"],"\n", vault_meta["auth_blob"],"\n", vault_meta["verifier_hash"])
+            
+            with open(META_FILE, "w") as meta_f:
+                json.dump(vault_meta, meta_f, indent=4)
+
             window.key = key
             editor.show()
             save_btn.show()
@@ -358,15 +363,14 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 window, "PassCore vault", "vault data is missing or corrupted.!"
             )
             return
+
         if not has_blobs(): # Open Empty editor to prevent integrity checks with no blobs.!
-            dialog = PasswordDialog(title="Create Vault", confirm=False)
+            dialog = PasswordDialog(title="Unlock Vault", confirm=False)
             ok = dialog.exec()
             if not ok:
-                window.close()
-                return
+                raise SystemExit
 
             masterpasswd = dialog.password.text()
-            QMessageBox.information(window, "PassCore Vault", "vault is empty.!")
 
             # Generates key for first run.!
             key = hash_secret_raw(
@@ -377,29 +381,44 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 parallelism=4, # No. of system threads/lanes
                 hash_len=32, # Output size, in bytes 32bytes = 256bits
                 type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
-            ) 
-            window.key = key
-            unlock_btn.hide()
-            editor.clear()
-            editor.setReadOnly(False)
-            window.notes = [{
-                "title": "Untitled Note",
-                "content": ""
-            }]
-            window.load_notes(window.notes)
-            lock_btn.setEnabled(True)
-            save_btn.setEnabled(True)
-            close_btn.setEnabled(True)
-            
-            window.status_label.setText("Unlocked")
-            window.add_note_btn.setEnabled(True)
-            window.note_title.setEnabled(True)
-
-            minutes = window.settings["auto_lock_min"]
-            window.autolock_timer.start(
-                minutes * 60 * 1000
             )
-            return
+            try:
+                with open(META_FILE, "r") as auth:
+                    auth_check = json.load(auth)
+                d_nonce = base64.b64decode(auth_check["auth_nonce"])
+                d_blob = base64.b64decode(auth_check["auth_blob"])
+                result = AESGCM(key).decrypt(d_nonce, d_blob, None)
+
+                if hashlib.sha256(result).hexdigest() != auth_check["verifier_hash"]:
+                    raise InvalidTag
+                QMessageBox.information(window, "PassCore", "Vault is empty.!")
+
+                window.key = key
+                unlock_btn.hide()
+                editor.clear()
+                editor.setReadOnly(False)
+                window.notes = [{
+                    "title": "Untitled Note",
+                    "content": ""
+                }]
+                window.load_notes(window.notes)
+                lock_btn.setEnabled(True)
+                save_btn.setEnabled(True)
+                close_btn.setEnabled(True)
+                
+                window.status_label.setText("Unlocked")
+                window.add_note_btn.setEnabled(True)
+                window.note_title.setEnabled(True)
+
+                minutes = window.settings["auto_lock_min"]
+                window.autolock_timer.start(
+                    minutes * 60 * 1000
+                )
+                return
+
+            except InvalidTag:
+                QMessageBox.information(window, "PassCore", "wrong master password.!")
+                continue
 
         try:
             try:
@@ -418,10 +437,9 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         
         dialog = PasswordDialog(title="Unlock Vault", confirm=False)
         ok = dialog.exec()
-
         if not ok:
-            window.close()
-            return
+            raise SystemExit
+        
         masterpasswd = dialog.password.text()
         
         # key for unlock and authenticate vault blobs
