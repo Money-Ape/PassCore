@@ -11,20 +11,27 @@ from file import import_txt, import_pcv, export_pcv
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
 
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 class PassCoreUI(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("PassCore vault")
         self.setWindowIcon(
-            QIcon("assets/PassCore.ico")
+            QIcon(resource_path("assets/PassCore.ico"))
         )
         self.resize(1250, 850)
         self.settings = load_settings()
         self.autolock_timer = QTimer()
         self.WELCOME_TEXT = """
             Welcome to PassCore.!
-            x86_64bit : 0.4.1_alpha
 
             Maintainer : Lovepreet Singh aka Money-Ape
 
@@ -1029,7 +1036,7 @@ class PasswordDialog(QDialog):
         self.apply_themes()
         self.confirm = confirm
         self.setWindowTitle(title)
-        self.setWindowIcon(QIcon("assets/PassCore.png"))
+        self.setWindowIcon(QIcon(resource_path("assets/PassCore.ico")))
         self.setStyleSheet(f"""
             QDialog {{
                 background-color: {self.w};

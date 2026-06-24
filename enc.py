@@ -1,6 +1,6 @@
-from gui import PassCoreUI, PasswordDialog
+from gui import PassCoreUI, PasswordDialog, QIcon
 from backup import create_backup, secure_del_tree
-import os, struct, json, platform, hashlib, uuid, base64
+import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -418,7 +418,6 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
 
             except InvalidTag:
                 QMessageBox.information(window, "PassCore", "wrong master password.!")
-                continue
 
         try:
             try:
@@ -566,8 +565,23 @@ def vault_close(window, key):
     elif reply == QMessageBox.Cancel:
         return
 
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 def user_edit():
+    myappid = "moneyape.passcore"
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+        myappid
+    )
     app = QApplication([])
+    icon = QIcon(resource_path("assets/PassCore.ico"))
+
+    app.setWindowIcon(icon)
     window = PassCoreUI()
     window.key = None
     editor = window.editor

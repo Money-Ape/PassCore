@@ -1,8 +1,8 @@
 #local files should be ignored.!!
 *.bin
-*.txt
 *.key
 *.salt
+*.exe
 
 packaging/linux/passcore_x86_64/src
 packaging/linux/passcore_x86_64/pkg
@@ -10,7 +10,7 @@ packaging/linux/passcore_x86_64/PassCore
 packaging/linux/passcore_x86_64/*.pkg.tar.zst
 packaging/linux/*.deb
 packaging/linux/passcore_0.4.1_amd64/usr/bin/passcore_amd64
-
+packaging/windows/release/LICENSE.txt
 # Vscode
 .vscode
 
