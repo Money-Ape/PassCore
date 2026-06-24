@@ -527,11 +527,12 @@ Backup retention automatically removes older backups after the configured limit 
 ---
 
 ## Platform Support
-
-| Arch Linux         | ✅ Tested |
-| Ubuntu             | ✅ Tested |
-| Windows 10         | ✅ Tested |
-| Windows 11         | ✅ Tested |
+| Platform | Status |
+|----------|--------|
+| Arch Linux | ✅ Tested |
+| Ubuntu | ✅ Tested |
+| Windows 10 | ✅ Tested |
+| Windows 11 | ✅ Tested |
 
 ---
 
