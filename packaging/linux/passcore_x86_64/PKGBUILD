@@ -1,5 +1,5 @@
 pkgname=passcore-bin
-pkgver=0.4.1
+pkgver=0.4.2
 pkgrel=1
 pkgdesc="Secure password manager with distributed vault architecture"
 arch=('x86_64')
@@ -8,7 +8,7 @@ license=('Apache-2.0')
 options=("!debug")
 
 source=("PassCore" "passcore.desktop" "PassCore.png")
-sha256sums=("94e8cb60a92ddd6292ab14727dd872f48685ad36a6df387107eae5c747ad8b4f" "523403f9c6074b231f5b6b0f489eacf2394bb699142dfc825723641ce442553f" "ca6d3d1c17f6a81ccc3df46027744002e5eb7e4b65618fd706df2b26d0c0560f")
+sha256sums=("f7b05c9e23a76bc3d4f2dd7bbaf46d71a1f38b63ab17b72262623ae562f50c62" "92da4fbd6aa50a604fdc3140dff8d345149580d50c2fd20264295ae94dfea617" "ca6d3d1c17f6a81ccc3df46027744002e5eb7e4b65618fd706df2b26d0c0560f")
 
 package() {
     install -Dm755 PassCore "$pkgdir/usr/bin/passcore"

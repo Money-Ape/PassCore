@@ -575,9 +575,10 @@ def resource_path(relative_path):
 
 def user_edit():
     myappid = "moneyape.passcore"
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-        myappid
-    )
+    if sys.platform.startswith("win") or sys.platform == "win32":
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            myappid
+        )
     app = QApplication([])
     icon = QIcon(resource_path("assets/PassCore.ico"))
 

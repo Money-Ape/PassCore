@@ -9,7 +9,7 @@ packaging/linux/passcore_x86_64/pkg
 packaging/linux/passcore_x86_64/PassCore
 packaging/linux/passcore_x86_64/*.pkg.tar.zst
 packaging/linux/*.deb
-packaging/linux/passcore_0.4.1_amd64/usr/bin/passcore_amd64
+packaging/linux/passcore_amd64/usr/bin/passcore
 packaging/windows/release/LICENSE.txt
 # Vscode
 .vscode
