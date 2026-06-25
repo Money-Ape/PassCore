@@ -159,7 +159,7 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
 
     encrypted_data.extend(struct.pack(">I", length)) # store encrypted raw bytes length
     encrypted_data.extend(record_enc_d) # store encrypted raw bytes record with nonce
-    # print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
+    print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
     blob_info = split_file_bin(bytes(encrypted_data), chunk_size=32)
     if not blob_info:
@@ -235,6 +235,7 @@ def decrypt_vault(key, encrypted_blobs):
             nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
             decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
             payload = decrypt_enc_d.decode()
+            print(f"{BLUE}DECRYPTED_BLOBS {record_enc_d}{RESET}: ",payload)
             return json.loads(payload)
                 
     except FileNotFoundError as e1:
@@ -579,6 +580,8 @@ def user_edit():
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
             myappid
         )
+    print("MEIPASS:", getattr(sys, "_MEIPASS", "NOT SET"))
+    print("EXISTS:", os.path.exists(resource_path("assets/PassCore.ico")))
     app = QApplication([])
     icon = QIcon(resource_path("assets/PassCore.ico"))
 

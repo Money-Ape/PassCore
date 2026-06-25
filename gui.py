@@ -23,6 +23,9 @@ class PassCoreUI(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        print("MEIPASS:", getattr(sys, "_MEIPASS", "NOT SET"))
+        print("ICON:", resource_path("assets/PassCore.ico"))
+        print("EXISTS:", os.path.exists(resource_path("assets/PassCore.ico")))
         self.setWindowTitle("PassCore vault")
         self.setWindowIcon(
             QIcon(resource_path("assets/PassCore.ico"))
