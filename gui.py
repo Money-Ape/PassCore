@@ -2,7 +2,7 @@ import sys, os, subprocess, json
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem)
-from PySide6.QtGui import QAction, QIcon, QTextCursor
+from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap
 from PySide6.QtCore import QTimer, Qt
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
@@ -1081,22 +1081,73 @@ class PasswordDialog(QDialog):
         self.unlock_btn.clicked.connect(self.validate_passwd)
         self.cancel_btn.clicked.connect(self.reject)
 
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel("Master Password")) # Master Password Dialog
-        layout.addWidget(self.password) # Password Input
+        # pAssCore logo
+        logo = QLabel()
+        pixmap = QPixmap(resource_path("assets/PassCore.png"))
+        logo.setPixmap(pixmap.scaled(
+            150, 150, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+        ))
+        logo.setAlignment(Qt.AlignmentFlag.AlignTop)
 
+        # Header
+        title_label = QLabel("PassCore")
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: 18pt;
+                font-weight: bold;
+                color: {self.t};
+            }}
+        """)
+        description_label = QLabel(
+            "PassCore is an offline-first password manager\n"
+            "focused on local encrypted vault storage.\n\n"
+            "Your data is secure.\n"
+            "Your vault never leaves your device."
+        )
+        description_label.setWordWrap(True)
+        description_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: 10pt;
+                color: {self.t};
+            }}
+        """)
+
+        info_layout = QVBoxLayout()
+        info_layout.addWidget(title_label)
+        info_layout.addWidget(description_label)
+        info_layout.addStretch()
+
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(logo)
+        header_layout.addSpacing(10)
+        header_layout.addLayout(info_layout)
+
+        # Password fields
+        form_layout = QVBoxLayout()
+        form_layout.addWidget(QLabel("Master Password"))
+        form_layout.addWidget(self.password)
         if self.confirm:
-            layout.addWidget(QLabel("Confirm Password"))
-            layout.addWidget(self.confirm_password)
-            
-        layout.addWidget(self.show_pass) # Checkbox Input
+            form_layout.addWidget(QLabel("Confirm Password"))
+            form_layout.addWidget(self.confirm_password)
+        
+        form_layout.addWidget(self.show_pass)
 
+        # Buttons
         btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
         btn_layout.addWidget(self.unlock_btn)
         btn_layout.addWidget(self.cancel_btn)
-        
+
+        # Main layout
+        layout = QVBoxLayout()
+        layout.addLayout(header_layout)
+        layout.setSpacing(20)
+        layout.addLayout(form_layout)
+        layout.addSpacing(10)
         layout.addLayout(btn_layout)
+        
         self.setLayout(layout)
+        self.setMinimumWidth(560)
     
     def apply_themes(self):
         theme = THEMES[self.settings["theme"]]
