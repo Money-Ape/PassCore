@@ -1,4 +1,4 @@
-import sys, os, subprocess, json
+import sys, os, subprocess, json, ctypes
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem)
@@ -465,6 +465,12 @@ class PassCoreUI(QMainWindow):
         theme_action = QAction("Theme", self) # File menu : Themes
         theme_action.triggered.connect(self.open_theme_dialog)
         settings_menu.addAction(theme_action)
+
+        capture_action = QAction("Hide from Screen capture/recording", self)
+        capture_action.setCheckable(True)
+        capture_action.setChecked(self.settings.get("hide_from_capture", False))
+        capture_action.toggled.connect(self.toggle_capture_protection)
+        settings_menu.addAction(capture_action)
                 
         edit_menu = menu.addMenu("Edit") # Edit Menu 
         create_backup_action = QAction("Create Backup", self) # Edit menu : Create Backup
@@ -651,6 +657,47 @@ class PassCoreUI(QMainWindow):
 
         root_layout.addWidget(self.sidebar)
         self.update_welcome_label()
+
+    def toggle_capture_protection(self, checked):
+        self.settings["hide_from_capture"] = checked
+        save_settings(self.settings)
+
+        self.apply_capture_protection()
+
+    def apply_capture_protection(self):
+        """
+            Enable or disable Windows screen capture protection.
+
+            This prevents screenshots and most screen-recording applications
+            from capturing the PassCore window on supported Windows versions.
+        """
+
+        if os.name != "nt":
+            return
+        
+        try:
+            WDA_NONE = 0x00000000
+            WDA_EXCLUDEFROMCAPTURE = 0x00000011
+
+            hwnd = int(self.winId())
+
+            affinity = (
+                WDA_EXCLUDEFROMCAPTURE
+                if self.settings.get("hide_from_capture", False)
+                else WDA_NONE
+            )
+
+            success = ctypes.windll.user32.SetWindowDisplayAffinity(
+                hwnd,
+                affinity
+            )
+
+            if not success:
+                error = ctypes.windll.kernel32.GetLastError()
+                print(f"[PassCore] SetWindowDisplayAffinity failed (Error {error})")
+
+        except Exception as e:
+            print(f"[PassCore] Capture protection error: {e}")
 
     def update_welcome_label(self):
         self.welcome_label.setVisible(
