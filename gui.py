@@ -2,7 +2,7 @@ import sys, os, subprocess, json, ctypes
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem)
-from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap
+from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent
 from PySide6.QtCore import QTimer, Qt
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
@@ -658,6 +658,10 @@ class PassCoreUI(QMainWindow):
         root_layout.addWidget(self.sidebar)
         self.update_welcome_label()
 
+    def showEvent(self, event: QShowEvent):
+        super().showEvent(event)
+        self.apply_capture_protection()
+
     def toggle_capture_protection(self, checked):
         self.settings["hide_from_capture"] = checked
         save_settings(self.settings)
@@ -673,13 +677,14 @@ class PassCoreUI(QMainWindow):
         """
 
         if os.name != "nt":
+            print("[PassCore] Screen capture protection is not supported on this platform.")
             return
         
         try:
             WDA_NONE = 0x00000000
             WDA_EXCLUDEFROMCAPTURE = 0x00000011
 
-            hwnd = int(self.winId())
+            hwnd = int(self.windowHandle().winId())
 
             affinity = (
                 WDA_EXCLUDEFROMCAPTURE
@@ -695,6 +700,10 @@ class PassCoreUI(QMainWindow):
             if not success:
                 error = ctypes.windll.kernel32.GetLastError()
                 print(f"[PassCore] SetWindowDisplayAffinity failed (Error {error})")
+                print("HWND:", hwnd)
+                print("Affinity:", hex(affinity))
+                print("Success:", success)
+                print("LastError:", error)
 
         except Exception as e:
             print(f"[PassCore] Capture protection error: {e}")
