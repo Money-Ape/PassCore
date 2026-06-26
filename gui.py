@@ -468,8 +468,16 @@ class PassCoreUI(QMainWindow):
 
         capture_action = QAction("Hide from Screen capture/recording", self)
         capture_action.setCheckable(True)
-        capture_action.setChecked(self.settings.get("hide_from_capture", False))
-        capture_action.toggled.connect(self.toggle_capture_protection)
+        if os.name != "nt":
+            capture_action.setEnabled(False)
+            capture_action.setToolTip("""
+                Linux: PySide6 includes a built-in Incognito mode, available via the window's top-left menu.
+                Hide from Screen capture currently available on Window.!
+                """)
+        else:
+            capture_action.setChecked(self.settings.get("hide_from_capture", False))
+            capture_action.toggled.connect(self.toggle_capture_protection)
+        
         settings_menu.addAction(capture_action)
                 
         edit_menu = menu.addMenu("Edit") # Edit Menu 
