@@ -235,7 +235,7 @@ def decrypt_vault(key, encrypted_blobs):
             nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
             decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
             payload = decrypt_enc_d.decode()
-            print(f"{BLUE}DECRYPTED_BLOBS {record_enc_d}{RESET}: ",payload)
+            print(f"{BLUE}DECRYPTED_BLOBS {record_enc_d}{RESET}")
             return json.loads(payload)
                 
     except FileNotFoundError as e1:
@@ -419,6 +419,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
 
             except InvalidTag:
                 QMessageBox.information(window, "PassCore", "wrong master password.!")
+                continue
 
         try:
             try:
@@ -536,7 +537,7 @@ def save_vault(window, editor, key):
     window.save_label.setText(
         f"Last Save\n{timestamp}"
     )
-    QMessageBox.information(None, "PassCore", "Vault saved successfully.!")
+    # QMessageBox.information(None, "PassCore", "Vault saved successfully.!")
 
 def vault_close(window, key):
     reply = QMessageBox.question(
