@@ -1,7 +1,7 @@
 import sys, os, subprocess, json, ctypes
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QStatusBar)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent
 from PySide6.QtCore import QTimer, Qt
 from backup import create_backup, restore_backup, META_FILE
@@ -466,14 +466,11 @@ class PassCoreUI(QMainWindow):
         theme_action.triggered.connect(self.open_theme_dialog)
         settings_menu.addAction(theme_action)
 
-        capture_action = QAction("Hide from Screen capture/recording", self)
+        capture_action = QAction("Hide from Screen capture/recording (Windows only)", self)
         capture_action.setCheckable(True)
         if os.name != "nt":
             capture_action.setEnabled(False)
-            capture_action.setToolTip("""
-                Linux: PySide6 includes a built-in Incognito mode, available via the window's top-left menu.
-                Hide from Screen capture currently available on Window.!
-                """)
+            
         else:
             capture_action.setChecked(self.settings.get("hide_from_capture", False))
             capture_action.toggled.connect(self.toggle_capture_protection)
