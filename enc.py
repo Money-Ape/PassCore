@@ -486,9 +486,6 @@ def autosave_vault(window, editor):
         if note["content"].strip()
     )
     if len(window.notes) == 1 and non_empty_notes == 0:
-        QMessageBox.information(
-            window, "PassCore", "Empty vault.!\nNothing to save."
-        )
         return
     
     if window.key is None:

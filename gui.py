@@ -1,9 +1,9 @@
 import sys, os, subprocess, json, ctypes
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QStatusBar)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint
 from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
 from health import vault_health
@@ -50,6 +50,7 @@ class PassCoreUI(QMainWindow):
         """.strip()
         self.apply_themes()
         self.build_ui()
+        self.menu_option = False
         self.lock_screen = (
             "mww mww hwm wwl mwwMmwwww wwwmmmwww mwww wwl w wlwwww\n"
             "wwwww nwwwwwww n lwwwww w wwwww mwww nwwwwwww Nw mww w lwwww nwwwww\n"
@@ -146,6 +147,56 @@ class PassCoreUI(QMainWindow):
                 color: {self.t};
             }}
         """)
+
+        # Slide Menu btn
+        self.menu_btn.setStyleSheet(f"""
+            QToolButton {{
+                color: {self.t};
+                background: transparent;
+                border: none;
+                padding: 2px 4px;
+                font-size: 13pt;
+            }}
+            QToolButton:hover {{
+                background: {self.i};
+                border-radius: 6px;
+            }}
+            QToolButton:pressed {{
+                background: {self.b};
+            }}
+        """)
+
+        # Slide Menubar
+        self.slide_menu.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.i};
+
+                border: 2px solid {self.b};
+
+                border-top-right-radius: 12px;
+                border-bottom-right-radius: 12px;
+
+                border-top-left-radius: 0px;
+                border-bottom-left-radius: 0px;
+            }}
+        """)
+
+        # Slide Menu btn
+        for btn in self.slide_btn:
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    color: {self.t};
+                    border: {self.b};
+                    text-align: left;
+                    padding: 8px;
+                    font-size: 11pt;
+                }}
+                QPushButton:hover {{
+                    background: {self.w};
+                    border-radius: 6px;
+                }}
+            """)
         
         # Editor
         self.editor.setStyleSheet(f"""
@@ -442,8 +493,36 @@ class PassCoreUI(QMainWindow):
 
     def build_ui(self):
 
+        # Central Widget
+        central = QWidget()
+        self.setCentralWidget(central)
+
+        # Slide Menu
+        self.slide_menu = QFrame(central)
+        self.slide_menu.setObjectName("Slide Menu")
+        self.slide_menu.setFixedWidth(205)
+
+        self.menu_animation = QPropertyAnimation(self.slide_menu, b"pos")
+        self.menu_animation.setDuration(205)
+        self.menu_animation.setEasingCurve(QEasingCurve.OutCubic)
+
+
+        self.slide_layout = QVBoxLayout(self.slide_menu)
+        self.slide_layout.setContentsMargins(10, 10, 10, 10)
+        self.slide_layout.addSpacing(8)
+        self.slide_menu.setLayout(self.slide_layout)
+        self.slide_menu_items()
+
         # Menu Bar
         menu = self.menuBar()
+        self.menu_btn = QToolButton(self)
+        self.menu_btn.setText("\u2630")
+        self.menu_btn.setAutoRaise(True)
+        self.menu_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        menu.setCornerWidget(self.menu_btn, Qt.Corner.TopLeftCorner)
+        self.menu_btn.clicked.connect(self.toggle_slide_menu)
+
         file_menu = menu.addMenu("File") # File Menu
         import_action = QAction("Import text", self) # File menu : Import text files
         import_action.triggered.connect(lambda: import_txt(self))
@@ -504,10 +583,6 @@ class PassCoreUI(QMainWindow):
         vault_health_action = QAction("Vault Health", self) # Tool menu : Vault health report
         vault_health_action.triggered.connect(self.show_vault_health)
         tools_menu.addAction(vault_health_action)
-
-        # Central Widget
-        central = QWidget()
-        self.setCentralWidget(central)
 
         root_layout = QHBoxLayout(central)
 
@@ -661,7 +736,65 @@ class PassCoreUI(QMainWindow):
         sidebar_layout.addLayout(row_2)
 
         root_layout.addWidget(self.sidebar)
+        
+        note_geo = self.note_list.geometry()
+        self.slide_menu.setGeometry(
+            -205, # hidden outside the window
+            note_geo.y(), # just below the menubar
+            205, # Drawer width
+            note_geo.height()
+        )
+        self.slide_menu.raise_()
+
         self.update_welcome_label()
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        note_geo = self.note_list.geometry()
+
+        self.slide_menu.setGeometry(
+            self.slide_menu.x(),
+            note_geo.y(), # just below the menubar
+            205, # Drawer width
+            note_geo.height()
+        )
+        self.slide_menu.raise_()
+
+    def slide_menu_items(self):
+        self.slide_btn = []
+        items = [
+            "🗝 Credentials",
+            "📝 Notes",
+            "📷 Images",
+            "📄 Documents",
+            "🎵 Audio",
+            "🎬 Videos",
+            "⭐ Favorites",
+            "🗑 Secure Trash"
+        ]
+        for item in items:
+            btn = QPushButton(item)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+            self.slide_btn.append(btn)
+            self.slide_layout.addWidget(btn)
+
+        self.slide_layout.addStretch()
+
+    def toggle_slide_menu(self):
+        self.slide_menu.raise_()
+        y = self.menuBar().height()
+
+        if self.menu_option:
+            self.menu_animation.setStartValue(QPoint(0, y))
+            self.menu_animation.setEndValue(QPoint(-205, y))
+        
+        else:
+            self.menu_animation.setStartValue(QPoint(-205, y))
+            self.menu_animation.setEndValue(QPoint(0, y))
+        
+        self.menu_animation.start()
+        self.menu_option = not self.menu_option
 
     def showEvent(self, event: QShowEvent):
         super().showEvent(event)
