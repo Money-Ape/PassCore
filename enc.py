@@ -259,6 +259,7 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
         window.status_label.setText("Locked")
         window.add_note_btn.setEnabled(False)
         window.note_title.setEnabled(False)
+        window.slide_menu.hide()
 
         lock_btn.setEnabled(False)
         lock_btn.hide()
@@ -344,6 +345,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             unlock_btn.hide()
             window.add_note_btn.setEnabled(True)
             window.note_title.setEnabled(True)
+            window.slide_menu.show()
 
             editor.clear()
             editor.setReadOnly(False)
@@ -410,6 +412,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 window.status_label.setText("Unlocked")
                 window.add_note_btn.setEnabled(True)
                 window.note_title.setEnabled(True)
+                window.slide_menu.show()
 
                 minutes = window.settings["auto_lock_min"]
                 window.autolock_timer.start(
@@ -471,6 +474,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
 
             save_btn.setEnabled(True)
             lock_btn.setEnabled(True)
+            window.slide_menu.show()
 
             minutes = window.settings["auto_lock_min"]
             window.autolock_timer.start(minutes * 60 * 1000)
@@ -515,6 +519,7 @@ def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     unlock_btn.setEnabled(True)
     save_btn.hide()
     close_btn.setEnabled(True)
+    window.slide_menu.hide()
 
     unlock_btn.show()
     window.key = None
