@@ -498,12 +498,13 @@ class PassCoreUI(QMainWindow):
         self.setCentralWidget(central)
 
         # Slide Menu
+        self.SLIDE_MENU_WIDTH = 205
         self.slide_menu = QFrame(central)
         self.slide_menu.setObjectName("Slide Menu")
-        self.slide_menu.setFixedWidth(205)
+        self.slide_menu.setFixedWidth(self.SLIDE_MENU_WIDTH)
 
         self.menu_animation = QPropertyAnimation(self.slide_menu, b"pos")
-        self.menu_animation.setDuration(205)
+        self.menu_animation.setDuration(self.SLIDE_MENU_WIDTH)
         self.menu_animation.setEasingCurve(QEasingCurve.OutCubic)
 
 
@@ -739,9 +740,9 @@ class PassCoreUI(QMainWindow):
         
         note_geo = self.note_list.geometry()
         self.slide_menu.setGeometry(
-            -205, # hidden outside the window
+            -self.SLIDE_MENU_WIDTH, # hidden outside the window
             note_geo.y(), # just below the menubar
-            205, # Drawer width
+            self.SLIDE_MENU_WIDTH, # Drawer width
             note_geo.height()
         )
         self.slide_menu.raise_()
@@ -755,7 +756,7 @@ class PassCoreUI(QMainWindow):
         self.slide_menu.setGeometry(
             self.slide_menu.x(),
             note_geo.y(), # just below the menubar
-            205, # Drawer width
+            self.SLIDE_MENU_WIDTH, # Drawer width
             note_geo.height()
         )
         self.slide_menu.raise_()
@@ -764,7 +765,6 @@ class PassCoreUI(QMainWindow):
         self.slide_btn = []
         items = [
             "🗝 Credentials",
-            "📝 Notes",
             "📷 Images",
             "📄 Documents",
             "🎵 Audio",
@@ -787,10 +787,10 @@ class PassCoreUI(QMainWindow):
 
         if self.menu_option:
             self.menu_animation.setStartValue(QPoint(0, y))
-            self.menu_animation.setEndValue(QPoint(-205, y))
+            self.menu_animation.setEndValue(QPoint(-self.SLIDE_MENU_WIDTH, y))
         
         else:
-            self.menu_animation.setStartValue(QPoint(-205, y))
+            self.menu_animation.setStartValue(QPoint(-self.SLIDE_MENU_WIDTH, y))
             self.menu_animation.setEndValue(QPoint(0, y))
         
         self.menu_animation.start()
