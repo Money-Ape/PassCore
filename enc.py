@@ -9,6 +9,16 @@ from PySide6.QtWidgets import(QApplication, QMessageBox)
 from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
 
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+IMAGE_PATH = resource_path("pcvmenu/images.py")
+
 RED = "\033[31m" # ERRORS & REPORT
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
 YELLOW = "\033[33m" # FRESH Keys, INTEGERS & OLD RECORDS 
@@ -568,14 +578,6 @@ def vault_close(window, key):
     
     elif reply == QMessageBox.Cancel:
         return
-
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
 
 def user_edit():
     myappid = "moneyape.passcore"

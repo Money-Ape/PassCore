@@ -36,7 +36,8 @@ class PassCoreImage(QMainWindow):
                 self.image_entry = {
                     "uuid": object_id,
                     "type": mime,
-                    "filename": self.image_path.stem,
+                    "filename": self.image_path.name,
+                    "stem": self.image_path.stem,
                     "extension": self.image_path.suffix,
                     "mode": PCi.mode,
                     "size": self.size_calc(len(self.image_bytes)),
