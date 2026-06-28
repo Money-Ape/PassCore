@@ -1,5 +1,5 @@
 from PIL import Image
-import sys, os, platform, mimetypes, uuid
+import sys, os, platform, mimetypes, uuid, hashlib
 from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog
 
@@ -20,30 +20,40 @@ class PassCoreImage(QMainWindow):
             self, "Select image", str(image), "", "PNG Images (*.png)",
             options=QFileDialog.Option.DontUseNativeDialog
         )
-        self.image_path = Path(image_file)
-
-        if not self.image_path:
+        if not image_file:
             return
 
+        self.image_path = Path(image_file)
+
         with Image.open(self.image_path) as PCi:
-            print("==============IMAGE==============")
-            print("Name      :    ",self.image_path.name)
-            print("Stem      :    ",self.image_path.stem)
-            print("Suffix    :    ",self.image_path.suffix)
-            print("Format    :    ",PCi.format)
-            print("Width     :    ",PCi.width)
-            print("Height    :    ",PCi.height)
-            print("Mode      :    ",PCi.mode)
 
-        with open(self.image_path, "rb") as img:
-            img_bytes = img.read()
-            print(f"Binary Size :  {len(img_bytes)} bytes")
-        
-        mime, _ = mimetypes.guess_type(self.image_path)
-        print("mime type : ", mime)
-
-        object_id = uuid.uuid5().hex[:32]
-        print(f"UUID[{len(object_id)}] : {object_id}")
+            with open(self.image_path, "rb") as img:
+                self.image_bytes = img.read()
+            
+                mime, _ = mimetypes.guess_type(self.image_path)
+                object_id = uuid.uuid4().hex[:32]
+                sha256 = hashlib.sha256(self.image_bytes).hexdigest()
+                self.image_entry = {
+                    "uuid": object_id,
+                    "type": mime,
+                    "filename": self.image_path.stem,
+                    "extension": self.image_path.suffix,
+                    "mode": PCi.mode,
+                    "size": self.size_calc(len(self.image_bytes)),
+                    "width": PCi.width,
+                    "height": PCi.height,
+                    "sha256": sha256
+                }
+                for key, value in self.image_entry.items():
+                    print(f"{key:<10} : {value}")
+    
+    def size_calc(self, size):
+        units = ["Bytes", "KB", "MB", "GB", "TB"]
+        for unit in units:
+            if size < 1024 or unit == "TB":
+                return f"{size:.2f} {unit}"
+            size /= 1024
+        return f"{size:.2f} PB"
 
 
 if __name__ == "__main__":
