@@ -10,7 +10,7 @@
 
 PassCore is a desktop password manager written in Python that focuses on local-first storage, authenticated encryption, vault integrity verification, and master-password-based access control.
 
-> **Project Status:** Alpha Release (v0.4.1)
+> **Project Status:** Alpha Release (v0.4.2)
 
 ---
 
