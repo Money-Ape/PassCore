@@ -1,13 +1,21 @@
 from PIL import Image
-import sys, os, mimetypes, uuid, hashlib, json
+import sys, os, platform, mimetypes, uuid, hashlib, json
 from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog
 from datetime import datetime
 from io import BytesIO
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-from backup import CONTAINER_DIR
+def get_container_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path.home() / ".local" / "share" / ".passcore_db"
+    
+    elif sys == "Windows":
+        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
+
+CONTAINER_DIR = get_container_dir()
 
 def resource_path(relative_path):
     try:
@@ -114,8 +122,6 @@ class PassCoreImage(QMainWindow):
         }
         with open(self.container_meta, "w") as ijson:
             json.dump(image_entry, ijson, indent=4)
-        
-        self.merge_image_bin()
 
     def size_calc(self, size):
         units = ["Bytes", "KB", "MB", "GB", "TB"]
