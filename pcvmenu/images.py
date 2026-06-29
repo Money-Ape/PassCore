@@ -5,6 +5,19 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog
 from datetime import datetime
 from io import BytesIO
 
+def get_PassCore_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path.home() / ".local" / "share" / "passcore"
+    
+    elif sys == "Windows":
+        return Path(os.getenv("APPDATA")) / "PassCore"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
+    
+PASSCORE_DIR = get_PassCore_dir()
+IMAGES_META = PASSCORE_DIR / "images_meta.json"
+
 def get_container_dir():
     sys = platform.system()
     if sys == "Linux":
@@ -49,13 +62,29 @@ class PassCoreImage(QMainWindow):
 
                 self.split_image_bin(self.image_bytes, chunk_size=1024)
 
+        self.images_meta = {} # PASSCORE_DIR images metadata
+        image_data = {}
+        timestamp = datetime.now().strftime("%d-%M-%Y %I:%M:%S %p")
+        image_data[self.image_path.stem] = {
+            "uuid": self.object_id,
+            "sha256": self.sha256,
+            "created_at": timestamp
+        }
+        self.images_meta = {
+            "mime": self.mime,
+            "extension": self.image_path.suffix,
+            "file": image_data
+        }
+        with open(IMAGES_META, "w") as f_init:
+            json.dump(self.images_meta, f_init, indent=4)
+
     def merge_image_bin(self):
         with open(self.container_meta, "r", encoding="utf-8") as read_meta:
-            image_meta = json.load(read_meta)
+            merge_meta = json.load(read_meta)
 
         merge_data = bytearray()
-        meta_uuid = image_meta["uuid"]
-        for blob_name, blob_info in image_meta["blobs"].items():
+        meta_uuid = self.images_meta["uuid"]
+        for blob_name, blob_info in merge_meta["blobs"].items():
             container_id = blob_info["container"]
             blob_path = CONTAINER_DIR / "images" / meta_uuid / container_id / blob_name
 
@@ -100,7 +129,7 @@ class PassCoreImage(QMainWindow):
         self.image_metadata()
 
     def image_metadata(self):
-        image_entry = {}
+        image_entry = {} # CONTAINER_DIR images metadata
         self.container_meta = CONTAINER_DIR / "images" / self.object_id / "metadata.json"
 
         timestamp = datetime.now().strftime("%d-%M-%Y %I:%M:%S %p")
@@ -116,7 +145,6 @@ class PassCoreImage(QMainWindow):
             "width": self.PCi.width,
             "height": self.PCi.height,
             "size": (len(self.image_bytes)),
-            "sha256": self.sha256,
             "blob_count": len(self.blob_info),
             "blobs": self.blob_info
         }
