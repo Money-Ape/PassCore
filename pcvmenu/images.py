@@ -87,7 +87,7 @@ class PassCoreImage(QMainWindow):
                 self.object_id = uuid.uuid4().hex[:32]
                 self.sha256 = hashlib.sha256(self.image_bytes).hexdigest()
 
-        timestamp = datetime.now().strftime("%d-%M-%Y %I:%M:%S %p")
+        timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
 
         # PASSCORE_DIR images metadata
         self.image_meta = {
@@ -97,13 +97,15 @@ class PassCoreImage(QMainWindow):
                     "mime": self.mime,
                     "extension": self.image_path.suffix,
                     "sha256": self.sha256,
-                    "created_at": timestamp
+                    "created_at": timestamp,
                 }
             }
         }
         if not IMAGES_META.exists(): # Initially create if IMAGES_META json not exists
             with open(IMAGES_META, "w") as f_init:
                 json.dump(self.image_meta, f_init, indent=4)
+            
+            self.split_image_bin(self.image_bytes, chunk_size=1024)
 
         else:
             with open(IMAGES_META, "r", encoding="utf-8") as read_f:
@@ -115,27 +117,41 @@ class PassCoreImage(QMainWindow):
                     QMessageBox.information(self, "PassCore Vault", "Image already exists." )
                     self.merge_image_bin()
                     return
-                
-                old_id = old_entry["uuid"]
-                old_created = old_entry["created_at"]
-                old_ctn = Path(CONTAINER_DIR / "images" / old_id)
-                if old_ctn.exists():
-                    secure_del_tree(old_ctn)
-            
+
+                else:
+                    # Modifies existed IMAGES_META json with new entry.
+                    image_info = {
+                        "uuid": self.object_id,
+                        "mime": self.mime,
+                        "extension": self.image_path.suffix,
+                        "sha256": self.sha256,
+                        "created_at": old_entry["created_at"],
+                        "modified": timestamp
+                    }
+                    old_meta["file"][self.image_path.name] = image_info
+                    with open(IMAGES_META, "w", encoding="utf-8") as update_meta:
+                        json.dump(old_meta, update_meta, indent=4)
+                    
+                    self.split_image_bin(self.image_bytes, chunk_size=1024)
+                    
+                    old_id = old_entry["uuid"]
+                    old_ctn = Path(CONTAINER_DIR / "images" / old_id)
+                    if old_ctn.exists():
+                        secure_del_tree(old_ctn)
             else:
-                old_created = timestamp # Update existed IMAGES_META json with new entries.
-                old_meta["file"][self.image_path.name] = {
+                # Update existed IMAGES_META json with new entries.
+                image_info = {
                     "uuid": self.object_id,
                     "mime": self.mime,
                     "extension": self.image_path.suffix,
                     "sha256": self.sha256,
-                    "created_at": old_created,
-                    "modified": timestamp
+                    "created_at": timestamp,
                 }
+                old_meta["file"][self.image_path.name] = image_info
                 with open(IMAGES_META, "w", encoding="utf-8") as update_meta:
                     json.dump(old_meta, update_meta, indent=4)
-            
-        self.split_image_bin(self.image_bytes, chunk_size=1024)
+
+                self.split_image_bin(self.image_bytes, chunk_size=1024)
 
     def merge_image_bin(self):
         with open(IMAGES_META, "r") as ijson:
@@ -146,11 +162,8 @@ class PassCoreImage(QMainWindow):
             print(f"{merge_i["file"][self.image_path.name]} not found.!")
             return
         
-        else:
-            with open(IMAGES_META, "r", encoding="utf-8") as id:
-                ctn_meta = json.load(id)
-            
-            image_id = ctn_meta["file"][self.image_path.name]["uuid"]
+        else:            
+            image_id = merge_i["file"][self.image_path.name]["uuid"]
             container_meta = CONTAINER_DIR / "images" / image_id / "metadata.json"
 
             merge_data = bytearray()
@@ -167,11 +180,8 @@ class PassCoreImage(QMainWindow):
                 with open(blob_path, "rb") as f:
                     merge_data.extend(f.read())
 
-            with open(IMAGES_META, "r") as read_meta:
-                read_i = json.load(read_meta)
-
             merge_hash = hashlib.sha256(merge_data).hexdigest()
-            if merge_hash != read_i["file"][self.image_path.name]["sha256"]:
+            if merge_hash != merge_i["file"][self.image_path.name]["sha256"]:
                 raise FileNotFoundError(f"{image_id} is corrupted.!")
 
             buffer = BytesIO(merge_data)
@@ -214,7 +224,7 @@ class PassCoreImage(QMainWindow):
         image_entry = {}
         container_meta = CONTAINER_DIR / "images" / self.object_id / "metadata.json"
 
-        timestamp = datetime.now().strftime("%d-%M-%Y %I:%M:%S %p")
+        timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
         image_entry = {
             "uuid": self.object_id,
             "created_at": timestamp,
