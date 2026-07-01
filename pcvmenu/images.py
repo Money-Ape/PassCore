@@ -65,6 +65,15 @@ def secure_del_tree(dir):
         
     dir.rmdir()
 
+def sha256_blob(shafile_path):
+    hh = hashlib.sha256() # hash helper to cross check modifixation of any blobs
+
+    with open(shafile_path, "rb") as bsha:
+        while chunk := bsha.read(8192): # Read 8KB at a time 
+            hh.update(chunk)
+
+    return hh.hexdigest() # return hexadecimal hash string.!
+
 class PassCoreImage(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -115,6 +124,7 @@ class PassCoreImage(QMainWindow):
                 old_entry = old_meta["file"][self.image_path.name]
                 if old_entry["sha256"] == self.sha256:
                     QMessageBox.information(self, "PassCore Vault", "Image already exists." )
+                    self.blob_integrity_verify()
                     self.merge_image_bin()
                     return
 
@@ -156,37 +166,65 @@ class PassCoreImage(QMainWindow):
     def merge_image_bin(self):
         with open(IMAGES_META, "r") as ijson:
             merge_i = json.load(ijson)
-            existed_hash = merge_i["file"][self.image_path.name]["sha256"]
-
-        if existed_hash != self.sha256:
-            print(f"{merge_i["file"][self.image_path.name]} not found.!")
-            return
         
-        else:            
-            image_id = merge_i["file"][self.image_path.name]["uuid"]
-            container_meta = CONTAINER_DIR / "images" / image_id / "metadata.json"
+        image_id = merge_i["file"][self.image_path.name]["uuid"]
+        container_meta = CONTAINER_DIR / "images" / image_id / "metadata.json"
 
-            merge_data = bytearray()
-            with open(container_meta, "r", encoding="utf-8") as read_meta:
-                merge_meta = json.load(read_meta)
+        merge_data = bytearray()
+        with open(container_meta, "r", encoding="utf-8") as read_meta:
+            merge_meta = json.load(read_meta)
 
-            for blob_name, blob_info in merge_meta["blobs"].items():
-                container_id = blob_info["container"]
-                blob_path = CONTAINER_DIR / "images" / image_id / container_id / blob_name
+        for blob_name, blob_info in merge_meta["blobs"].items():
+            container_id = blob_info["container"]
+            blob_path = CONTAINER_DIR / "images" / image_id / container_id / blob_name
 
-                if not blob_path.exists():
-                    raise FileNotFoundError(f"Missing blob: {blob_name}")
-                
-                with open(blob_path, "rb") as f:
-                    merge_data.extend(f.read())
+            if not blob_path.exists():
+                raise FileNotFoundError(f"Missing blob: {blob_name}")
+            
+            with open(blob_path, "rb") as f:
+                merge_data.extend(f.read())
 
-            merge_hash = hashlib.sha256(merge_data).hexdigest()
-            if merge_hash != merge_i["file"][self.image_path.name]["sha256"]:
-                raise FileNotFoundError(f"{image_id} is corrupted.!")
+        merge_hash = hashlib.sha256(merge_data).hexdigest()
+        if merge_hash != merge_i["file"][self.image_path.name]["sha256"]:
+            raise FileNotFoundError(f"{image_id} is corrupted.!")
 
-            buffer = BytesIO(merge_data)
-            buffer_i = Image.open(buffer)
-            buffer_i.show()
+        buffer = BytesIO(merge_data)
+        buffer_i = Image.open(buffer)
+        buffer_i.show()
+
+    def blob_integrity_verify(self):
+        with open(IMAGES_META, "r") as r_meta:
+            blob_meta = json.load(r_meta)
+        
+        blob_id = blob_meta["file"][self.image_path.name]
+        blob_meta_path = Path(CONTAINER_DIR / "images" / blob_id["uuid"] / "metadata.json") 
+        if not blob_meta_path.exists():
+            raise FileNotFoundError("Metadata file is missing")
+        
+        with open(blob_meta_path, "r", encoding="utf-8") as b_meta:
+            ctn_meta = json.load(b_meta)
+
+        expected_blobs = ctn_meta["blobs"] # outputs the blob dict from metadata.
+        for blob_name in expected_blobs:
+            container_id = expected_blobs[blob_name]["container"]
+            blob_path = Path(CONTAINER_DIR / "images" / blob_id["uuid"] / container_id / blob_name) # existing blobs path
+            if not blob_path.exists():
+                raise FileNotFoundError(f"Missing blob.: {blob_name}")
+            
+            actual_size = blob_path.stat().st_size # outputs file size of blobs (each blob)
+            expected_size = expected_blobs[blob_name]["size"] # Store size of a blob from metadata.
+            if actual_size != expected_size: # Compares the physcially stored blob with metadata blobs sizes.!
+                raise ValueError(f"blob size mismatch.: {blob_name}")
+
+            expected_hash = expected_blobs[blob_name]["sha256"] # outputs stored hash of existing blob
+            actual_hash = sha256_blob(blob_path) # generate hash for existing blob bytes
+            if actual_hash != expected_hash:
+                raise ValueError(f"Hash mismatch.: {blob_name}")
+            
+        actual_blobs = len(ctn_meta["blobs"])
+        
+        if actual_blobs != ctn_meta["blob_count"]:
+            raise ValueError("blob count mismatch.!")
 
     def split_image_bin(self, image_bytes, chunk_size=1024):
         self.blob_info = {}
@@ -243,6 +281,7 @@ class PassCoreImage(QMainWindow):
         with open(container_meta, "w") as ijson:
             json.dump(image_entry, ijson, indent=4)
 
+        self.blob_integrity_verify()
         self.merge_image_bin()
 
     def size_calc(self, size):
