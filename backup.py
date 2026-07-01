@@ -4,6 +4,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
+YELLOW = "\033[33m" # FRESH Keys, INTEGERS & OLD RECORDS
 RESET = "\033[0m"
 
 def secure_del_file(path):
@@ -64,10 +65,11 @@ META_FILE = PASSCORE_DIR / "meta.json"
 BACKUP_ROOT = Path.home() / "Documents" / "PassCore Backups" # PassCore Backups root
 BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
 
-def create_backup():    
-    timestamp = datetime.now().strftime("%d%m%Y%H%M")
+def create_backup():
+    timestamp = datetime.now().strftime("%d%m%Y%H%M%S")
     zip_dir = BACKUP_ROOT / f"passcore_backup_{timestamp}.zip"
-    
+
+    print(f"Creating Backup[{GREEN}{zip_dir.name}{RESET}]")
     with zipfile.ZipFile(zip_dir, "w", compression=zipfile.ZIP_DEFLATED) as backto_zip: # writes splitted blobs into zipfile for backup
         backto_zip.write(SALT_FILE, arcname=SALT_FILE.name)
         backto_zip.write(META_FILE, arcname=META_FILE.name)
@@ -75,14 +77,16 @@ def create_backup():
         for file in CONTAINER_DIR.rglob("*"):
             if file.is_file():
                 backto_zip.write(file, arcname=file.relative_to(CONTAINER_DIR))
-    
+
     MAX_BACKUPS = 10
     all_backups = sorted(BACKUP_ROOT.glob("*.zip"))
     while len(all_backups) > MAX_BACKUPS:
         old_backup = all_backups.pop(0)
         old_backup.unlink()
 
+    print(f"Exists: {YELLOW}{zip_dir.exists()}{RESET}")
     print(f"\nBackup Created[{GREEN}{zip_dir}{RESET}]")
+    print(f"Size: {YELLOW}{zip_dir.stat().st_size}{RESET} bytes")
 
 def restore_backup(window):
     backupzip_dir = Path.home() / "Documents" / "PassCore Backups"

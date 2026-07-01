@@ -1,7 +1,19 @@
-import zipfile, shutil, tempfile, json
+import zipfile, shutil, tempfile, json, platform, os
 from pathlib import Path
-from backup import CONTAINER_DIR, META_FILE, SALT_FILE, secure_del_tree
+from backup import META_FILE, SALT_FILE, secure_del_tree
 from PySide6.QtWidgets import (QMessageBox, QFileDialog)
+
+def get_container_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path.home() / ".local" / "share" / ".passcore_db" / "notes"
+    
+    elif sys == "Windows":
+        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData" / "notes"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
+
+CONTAINER_DIR = get_container_dir()
 
 def import_txt(window):
         if window.key is None:
@@ -16,7 +28,7 @@ def import_txt(window):
             return
         
         reply = QMessageBox.question(
-            window, "Import Records", "Replace current vault contents.?\n\nYes : Replace\nNo : Add", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
+            window, "Import Records", "Replace current vault contents.?\n\nYes -> Replace current note\nNo -> Add into existing one\nCancel -> Abort", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
         )
         if reply == QMessageBox.Cancel:
             return
@@ -28,23 +40,31 @@ def import_txt(window):
             note_title = Path(file_path).stem
             if reply == QMessageBox.Yes:
                 window.save_current_note()
-                window.notes = [{
-                    "title": note_title,
-                    "content": imported_txt
-                }]
-                window.note_list.clear()
-                window.note_list.addItem(note_title)
-                window.current_note = -1
-                window.note_list.setCurrentRow(0)
-            
+
+                # Replace only the current selected note.
+                window.notes[window.current_note]["title"] = note_title
+                window.notes[window.current_note]["content"] = imported_txt
+
+                # Update only current item in note_list
+                item = window.note_list.item(window.current_note)
+                item.setText(note_title)
+
+                # Reload the editor.
+                window.note_title.setText(note_title)
+                window.editor.setPlainText(imported_txt)
+
             else:
                 window.save_current_note()
-                window.notes.append({
-                    "title": note_title,
-                    "content": imported_txt
-                })
-                window.note_list.addItem(note_title)
-                window.note_list.setCurrentRow(len(window.notes) -1)
+                current_text = window.editor.toPlainText()
+                if current_text.strip():
+                    new_text = current_text + "\n\n" + imported_txt
+                else:
+                    new_text = imported_txt
+
+                window.notes[window.current_note]["content"] = new_text
+                window.editor.setPlainText(new_text)
+
+                window.save_current_note()
             
             QMessageBox.information(window, "PassCore", "Records imported successfully.!")
 

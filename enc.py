@@ -28,10 +28,10 @@ RESET = "\033[0m"
 def get_container_dir():
     sys = platform.system()
     if sys == "Linux":
-        return Path.home() / ".local" / "share" / ".passcore_db"
+        return Path.home() / ".local" / "share" / ".passcore_db" / "notes"
     
     elif sys == "Windows":
-        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData"
+        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData" / "notes"
     else:
         raise RuntimeError(f"Unsupported OS: {sys}")
 
@@ -174,7 +174,7 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
     blob_info = split_file_bin(bytes(encrypted_data), chunk_size=32)
     if not blob_info:
         raise RuntimeError("No blobs generated.!")
-     
+
     timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
     blob_data = {}
     total_size = 0
@@ -542,8 +542,8 @@ def save_vault(window, editor, key):
         QMessageBox.information(window, "PassCore", "Empty vault.!\n\nNothing to save.")
         return
     
-    create_backup()
     encrypt_vault(window.notes, key)
+    create_backup()
     window.update_vault_size()
     timestamp = datetime.now().strftime("%I:%M:%S %p")
     window.save_label.setText(
