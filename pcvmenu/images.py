@@ -2,6 +2,7 @@ from PIL import Image
 import sys, os, platform, mimetypes, uuid, hashlib, json
 from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox
+from PySide6.QtGui import QPixmap
 from datetime import datetime
 from io import BytesIO
 
@@ -21,10 +22,10 @@ IMAGES_META = PASSCORE_DIR / "images_index.json"
 def get_container_dir():
     sys = platform.system()
     if sys == "Linux":
-        return Path.home() / ".local" / "share" / ".passcore_db"
+        return Path.home() / ".local" / "share" / ".passcore_db" / "images"
     
     elif sys == "Windows":
-        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData"
+        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData" / "images"
     else:
         raise RuntimeError(f"Unsupported OS: {sys}")
 
@@ -100,13 +101,15 @@ class PassCoreImage(QMainWindow):
 
         # PASSCORE_DIR images metadata
         self.image_meta = {
-            "file": {
-                self.image_path.name: {
-                    "uuid": self.object_id,
-                    "mime": self.mime,
-                    "extension": self.image_path.suffix,
-                    "sha256": self.sha256,
-                    "created_at": timestamp,
+            "albums": {
+                "Default": {
+                    self.image_path.name: {
+                        "uuid": self.object_id,
+                        "mime": self.mime,
+                        "extension": self.image_path.suffix,
+                        "sha256": self.sha256,
+                        "created_at": timestamp,
+                    }
                 }
             }
         }
@@ -120,8 +123,14 @@ class PassCoreImage(QMainWindow):
             with open(IMAGES_META, "r", encoding="utf-8") as read_f:
                 old_meta = json.load(read_f)
             
-            if self.image_path.name in old_meta["file"]:
-                old_entry = old_meta["file"][self.image_path.name]
+            albums = old_meta["albums"]
+            if "Default" not in albums:
+                albums["Default"] = {}
+            
+            default_albums = albums["Default"]
+            
+            if self.image_path.name in default_albums:
+                old_entry = default_albums[self.image_path.name]
                 if old_entry["sha256"] == self.sha256:
                     QMessageBox.information(self, "PassCore Vault", "Image already exists." )
                     self.blob_integrity_verify()
@@ -138,14 +147,14 @@ class PassCoreImage(QMainWindow):
                         "created_at": old_entry["created_at"],
                         "modified": timestamp
                     }
-                    old_meta["file"][self.image_path.name] = image_info
+                    default_albums[self.image_path.name] = image_info
                     with open(IMAGES_META, "w", encoding="utf-8") as update_meta:
                         json.dump(old_meta, update_meta, indent=4)
                     
                     self.split_image_bin(self.image_bytes, chunk_size=1024)
                     
                     old_id = old_entry["uuid"]
-                    old_ctn = Path(CONTAINER_DIR / "images" / old_id)
+                    old_ctn = Path(CONTAINER_DIR / old_id)
                     if old_ctn.exists():
                         secure_del_tree(old_ctn)
             else:
@@ -157,18 +166,19 @@ class PassCoreImage(QMainWindow):
                     "sha256": self.sha256,
                     "created_at": timestamp,
                 }
-                old_meta["file"][self.image_path.name] = image_info
+                default_albums[self.image_path.name] = image_info
                 with open(IMAGES_META, "w", encoding="utf-8") as update_meta:
                     json.dump(old_meta, update_meta, indent=4)
 
                 self.split_image_bin(self.image_bytes, chunk_size=1024)
 
-    def merge_image_bin(self):
+    @staticmethod
+    def merge_image_bin(filename):
         with open(IMAGES_META, "r") as ijson:
             merge_i = json.load(ijson)
         
-        image_id = merge_i["file"][self.image_path.name]["uuid"]
-        container_meta = CONTAINER_DIR / "images" / image_id / "metadata.json"
+        image_id = merge_i["albums"]["Default"][filename]["uuid"]
+        container_meta = CONTAINER_DIR / image_id / "metadata.json"
 
         merge_data = bytearray()
         with open(container_meta, "r", encoding="utf-8") as read_meta:
@@ -176,7 +186,7 @@ class PassCoreImage(QMainWindow):
 
         for blob_name, blob_info in merge_meta["blobs"].items():
             container_id = blob_info["container"]
-            blob_path = CONTAINER_DIR / "images" / image_id / container_id / blob_name
+            blob_path = CONTAINER_DIR / image_id / container_id / blob_name
 
             if not blob_path.exists():
                 raise FileNotFoundError(f"Missing blob: {blob_name}")
@@ -185,19 +195,36 @@ class PassCoreImage(QMainWindow):
                 merge_data.extend(f.read())
 
         merge_hash = hashlib.sha256(merge_data).hexdigest()
-        if merge_hash != merge_i["file"][self.image_path.name]["sha256"]:
+        if merge_hash != merge_i["albums"]["Default"][filename]["sha256"]:
             raise FileNotFoundError(f"{image_id} is corrupted.!")
 
-        buffer = BytesIO(merge_data)
-        buffer_i = Image.open(buffer)
-        buffer_i.show()
+        # buffer = BytesIO(merge_data)
+        # buffer_i = Image.open(buffer)
+        # buffer_i.show()
+
+        return bytes(merge_data)
+
+    @staticmethod
+    def load_preview(filename):
+        image_bytes = PassCoreImage.merge_image_bin(filename)
+        if image_bytes is None:
+            return None
+        
+        buffer = BytesIO(image_bytes)
+        img = Image.open(buffer)
+        img = img.convert("RGBA")
+        out = BytesIO()
+        img.save(out, format="PNG")
+        pixmap = QPixmap()
+        pixmap.loadFromData(out.getvalue())
+        return pixmap
 
     def blob_integrity_verify(self):
         with open(IMAGES_META, "r") as r_meta:
             blob_meta = json.load(r_meta)
         
-        blob_id = blob_meta["file"][self.image_path.name]
-        blob_meta_path = Path(CONTAINER_DIR / "images" / blob_id["uuid"] / "metadata.json") 
+        blob_id = blob_meta["albums"]["Default"][self.image_path.name]
+        blob_meta_path = Path(CONTAINER_DIR / blob_id["uuid"] / "metadata.json") 
         if not blob_meta_path.exists():
             raise FileNotFoundError("Metadata file is missing")
         
@@ -207,7 +234,7 @@ class PassCoreImage(QMainWindow):
         expected_blobs = ctn_meta["blobs"] # outputs the blob dict from metadata.
         for blob_name in expected_blobs:
             container_id = expected_blobs[blob_name]["container"]
-            blob_path = Path(CONTAINER_DIR / "images" / blob_id["uuid"] / container_id / blob_name) # existing blobs path
+            blob_path = Path(CONTAINER_DIR / blob_id["uuid"] / container_id / blob_name) # existing blobs path
             if not blob_path.exists():
                 raise FileNotFoundError(f"Missing blob.: {blob_name}")
             
@@ -230,7 +257,7 @@ class PassCoreImage(QMainWindow):
         self.blob_info = {}
         index = 0
         
-        container_path = CONTAINER_DIR / "images" / self.object_id
+        container_path = CONTAINER_DIR / self.object_id
         container_path.mkdir(parents=True, exist_ok=True)
 
         for offset in range(0, len(image_bytes), chunk_size):
@@ -260,7 +287,7 @@ class PassCoreImage(QMainWindow):
 
         # CONTAINER_DIR images metadata
         image_entry = {}
-        container_meta = CONTAINER_DIR / "images" / self.object_id / "metadata.json"
+        container_meta = CONTAINER_DIR / self.object_id / "metadata.json"
 
         timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
         image_entry = {
