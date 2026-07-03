@@ -78,36 +78,41 @@ def sha256_blob(shafile_path):
 class PassCoreImage(QMainWindow):
     def __init__(self):
         super().__init__()
-        image = Path.home() / "Pictures"
+    
+    @staticmethod
+    def import_image(image_path, album_name):
+        image_path = Path(image_path)
+        with Image.open(image_path) as PCi:
 
-        image_file, _ = QFileDialog.getOpenFileName(
-            self, "Select image", str(image), "", "PNG Images (*.png)",
-            options=QFileDialog.Option.DontUseNativeDialog
-        )
-        if not image_file:
-            return
+            with open(image_path, "rb") as img:
+                image_bytes = img.read()
 
-        self.image_path = Path(image_file)
-        with Image.open(self.image_path) as self.PCi:
+            mime, _ = mimetypes.guess_type(image_path)
 
-            with open(self.image_path, "rb") as img:
-                self.image_bytes = img.read()
-            
-                self.mime, _ = mimetypes.guess_type(self.image_path)
-                self.object_id = uuid.uuid4().hex[:32]
-                self.sha256 = hashlib.sha256(self.image_bytes).hexdigest()
+            # PASSCORE_DIR images metadata
+            image_info = {
+                "object_id": uuid.uuid4().hex[:32],
+                "image_path": image_path,
+                "image_bytes": image_bytes,
+                "mime": mime,
+                "width": img.width,
+                "height": img.height,
+                "mode": img.mode,
+                "format": img.format,
+                "sha256": hashlib.sha256(image_bytes).hexdigest()
+            }
+        PassCoreImage.split_image_bin(image_info, album_name)
 
         timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
-
         # PASSCORE_DIR images metadata
-        self.image_meta = {
+        image_meta = {
             "albums": {
                 "Default": {
-                    self.image_path.name: {
-                        "uuid": self.object_id,
-                        "mime": self.mime,
-                        "extension": self.image_path.suffix,
-                        "sha256": self.sha256,
+                    image_path.name: {
+                        "uuid": image_info["object_id"],
+                        "mime": mime,
+                        "extension": image_path.suffix,
+                        "sha256": image_info["sha256"],
                         "created_at": timestamp,
                     }
                 }
@@ -115,9 +120,9 @@ class PassCoreImage(QMainWindow):
         }
         if not IMAGES_META.exists(): # Initially create if IMAGES_META json not exists
             with open(IMAGES_META, "w") as f_init:
-                json.dump(self.image_meta, f_init, indent=4)
-            
-            self.split_image_bin(self.image_bytes, chunk_size=1024)
+                json.dump(image_meta, f_init, indent=4)
+
+            PassCoreImage.split_image_bin(image_info, album_name, chunk_size=1024)
 
         else:
             with open(IMAGES_META, "r", encoding="utf-8") as read_f:
@@ -125,33 +130,34 @@ class PassCoreImage(QMainWindow):
             
             albums = old_meta["albums"]
             if "Default" not in albums:
-                albums["Default"] = {}
+                albums[album_name] = {}
             
-            default_albums = albums["Default"]
+            default_albums = albums[album_name]
             
-            if self.image_path.name in default_albums:
-                old_entry = default_albums[self.image_path.name]
-                if old_entry["sha256"] == self.sha256:
-                    QMessageBox.information(self, "PassCore Vault", "Image already exists." )
-                    self.blob_integrity_verify()
-                    self.merge_image_bin()
+            if image_path.name in default_albums:
+                old_entry = default_albums[image_path.name]
+                if old_entry["sha256"] == image_info["sha256"]:
+                    QMessageBox.information(None, "PassCore Vault", "Image already exists." )
+                    PassCoreImage.blob_integrity_verify(image_info, album_name)
+                    PassCoreImage.merge_image_bin(image_path.name, album_name)
                     return
 
                 else:
                     # Modifies existed IMAGES_META json with new entry.
-                    image_info = {
-                        "uuid": self.object_id,
-                        "mime": self.mime,
-                        "extension": self.image_path.suffix,
-                        "sha256": self.sha256,
+                    image_data = {
+                        "uuid": image_info["object_id"],
+                        "width": image_info["width"],
+                        "height": image_info["height"],
+                        "size" : len(image_info["image_bytes"]),
+                        "sha256": image_info["sha256"],
                         "created_at": old_entry["created_at"],
                         "modified": timestamp
                     }
-                    default_albums[self.image_path.name] = image_info
+                    default_albums[image_path.name] = image_data
                     with open(IMAGES_META, "w", encoding="utf-8") as update_meta:
-                        json.dump(old_meta, update_meta, indent=4)
+                        json.dump(default_albums, update_meta, indent=4)
                     
-                    self.split_image_bin(self.image_bytes, chunk_size=1024)
+                    PassCoreImage.split_image_bin(image_info, album_name, chunk_size=1024)
                     
                     old_id = old_entry["uuid"]
                     old_ctn = Path(CONTAINER_DIR / old_id)
@@ -159,25 +165,26 @@ class PassCoreImage(QMainWindow):
                         secure_del_tree(old_ctn)
             else:
                 # Update existed IMAGES_META json with new entries.
-                image_info = {
-                    "uuid": self.object_id,
-                    "mime": self.mime,
-                    "extension": self.image_path.suffix,
-                    "sha256": self.sha256,
+                image_data = {
+                    "uuid": image_info["object_id"],
+                    "width": image_info["width"],
+                    "height": image_info["height"],
+                    "size" : len(image_info["image_bytes"]),
+                    "sha256": image_info["sha256"],
                     "created_at": timestamp,
                 }
-                default_albums[self.image_path.name] = image_info
+                default_albums[image_path.name] = image_info
                 with open(IMAGES_META, "w", encoding="utf-8") as update_meta:
                     json.dump(old_meta, update_meta, indent=4)
 
-                self.split_image_bin(self.image_bytes, chunk_size=1024)
+                PassCoreImage.split_image_bin(image_info, album_name, chunk_size=1024)
 
     @staticmethod
-    def merge_image_bin(filename):
+    def merge_image_bin(filename, album_name):
         with open(IMAGES_META, "r") as ijson:
             merge_i = json.load(ijson)
         
-        image_id = merge_i["albums"]["Default"][filename]["uuid"]
+        image_id = merge_i["albums"][album_name][filename]["uuid"]
         container_meta = CONTAINER_DIR / image_id / "metadata.json"
 
         merge_data = bytearray()
@@ -195,35 +202,32 @@ class PassCoreImage(QMainWindow):
                 merge_data.extend(f.read())
 
         merge_hash = hashlib.sha256(merge_data).hexdigest()
-        if merge_hash != merge_i["albums"]["Default"][filename]["sha256"]:
-            raise FileNotFoundError(f"{image_id} is corrupted.!")
-
-        # buffer = BytesIO(merge_data)
-        # buffer_i = Image.open(buffer)
-        # buffer_i.show()
+        if merge_hash != merge_i["albums"][album_name][filename]["sha256"]:
+            raise FileNotFoundError(f"Merged image: {image_id}; failed integrity verification is corrupted.!")
 
         return bytes(merge_data)
 
     @staticmethod
-    def load_preview(filename):
-        image_bytes = PassCoreImage.merge_image_bin(filename)
+    def load_preview(filename, album_name):
+        image_bytes = PassCoreImage.merge_image_bin(filename, album_name)
         if image_bytes is None:
             return None
         
         buffer = BytesIO(image_bytes)
-        img = Image.open(buffer)
-        img = img.convert("RGBA")
+        img = Image.open(buffer).convert("RGBA")
         out = BytesIO()
         img.save(out, format="PNG")
         pixmap = QPixmap()
         pixmap.loadFromData(out.getvalue())
         return pixmap
 
-    def blob_integrity_verify(self):
+    def blob_integrity_verify(image_info, album_name):
+        image_path = image_info["image_path"]
+
         with open(IMAGES_META, "r") as r_meta:
             blob_meta = json.load(r_meta)
         
-        blob_id = blob_meta["albums"]["Default"][self.image_path.name]
+        blob_id = blob_meta["albums"][album_name][image_path.name]
         blob_meta_path = Path(CONTAINER_DIR / blob_id["uuid"] / "metadata.json") 
         if not blob_meta_path.exists():
             raise FileNotFoundError("Metadata file is missing")
@@ -253,11 +257,16 @@ class PassCoreImage(QMainWindow):
         if actual_blobs != ctn_meta["blob_count"]:
             raise ValueError("blob count mismatch.!")
 
-    def split_image_bin(self, image_bytes, chunk_size=1024):
-        self.blob_info = {}
+    @staticmethod
+    def split_image_bin(image_info, album_name, chunk_size=1024):
+        object_id = image_info["object_id"]
+        image_path = image_info["image_path"]
+        image_bytes = image_info["image_bytes"]
+
+        blob_info = {}
         index = 0
         
-        container_path = CONTAINER_DIR / self.object_id
+        container_path = CONTAINER_DIR / object_id
         container_path.mkdir(parents=True, exist_ok=True)
 
         for offset in range(0, len(image_bytes), chunk_size):
@@ -269,47 +278,50 @@ class PassCoreImage(QMainWindow):
             blob_container_path = container_path / blob_container_id
             blob_container_path.mkdir(parents=True, exist_ok=True)
 
-            path = (blob_container_path / f"{self.object_id}_{index:04d}.bin").resolve()
+            path = (blob_container_path / f"{object_id}_{index:04d}.bin").resolve()
             blob_sha256 = hashlib.sha256(chunk).hexdigest()
             with open(path, "wb") as image_to_path:
                 image_to_path.write(chunk)
             
-            self.blob_info[path.name] = {
+            blob_info[path.name] = {
                 "container": blob_container_id,
                 "size": (len(chunk)),
                 "sha256": blob_sha256
             }
             index += 1
 
-        self.image_metadata()
+        PassCoreImage.image_metadata(image_info, blob_info, album_name)
 
-    def image_metadata(self):
+    @staticmethod
+    def image_metadata(image_info, blob_info, album_name):
+        object_id = image_info["object_id"]
+        image_path = image_info["image_path"]
+        image_bytes = image_info["image_bytes"]
 
         # CONTAINER_DIR images metadata
         image_entry = {}
-        container_meta = CONTAINER_DIR / self.object_id / "metadata.json"
+        container_meta = CONTAINER_DIR / object_id / "metadata.json"
 
         timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
         image_entry = {
-            "uuid": self.object_id,
+            "uuid": object_id,
             "created_at": timestamp,
-            "filename": self.image_path.name,
-            "stem": self.image_path.stem,
-            "extension": self.image_path.suffix,
-            "mime": self.mime,
-            "mode": self.PCi.mode,
-            "format": self.PCi.format,
-            "width": self.PCi.width,
-            "height": self.PCi.height,
-            "size": (len(self.image_bytes)),
-            "blob_count": len(self.blob_info),
-            "blobs": self.blob_info
+            "filename": image_path.name,
+            "stem": image_path.stem,
+            "extension": image_path.suffix,
+            "mime": image_info["mime"],
+            "mode": image_info["mode"],
+            "format": image_info["format"],
+            "width": image_info["width"],
+            "height": image_info["height"],
+            "size": (len(image_bytes)),
+            "blob_count": len(blob_info),
+            "blobs": blob_info
         }
         with open(container_meta, "w") as ijson:
             json.dump(image_entry, ijson, indent=4)
 
-        self.blob_integrity_verify()
-        self.merge_image_bin()
+        PassCoreImage.blob_integrity_verify(image_info, album_name)
 
     def size_calc(self, size):
         units = ["Bytes", "KB", "MB", "GB", "TB"]
