@@ -267,7 +267,7 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
         editor.setPlainText(window.lock_screen)
         editor.setReadOnly(True)
         window.status_label.setText("Locked")
-        window.add_note_btn.setEnabled(False)
+        window.add_btn.setEnabled(False)
         window.note_title.setEnabled(False)
         window.slide_menu.hide()
 
@@ -353,7 +353,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             close_btn.show()
             lock_btn.show()
             unlock_btn.hide()
-            window.add_note_btn.setEnabled(True)
+            window.add_btn.setEnabled(True)
             window.note_title.setEnabled(True)
             window.slide_menu.show()
 
@@ -420,7 +420,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 close_btn.setEnabled(True)
                 
                 window.status_label.setText("Unlocked")
-                window.add_note_btn.setEnabled(True)
+                window.add_btn.setEnabled(True)
                 window.note_title.setEnabled(True)
                 window.slide_menu.show()
 
@@ -471,7 +471,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             vault_notes = decrypt_vault(key, encrypted_blobs)
             
             unlock_btn.hide()
-            window.add_note_btn.setEnabled(True)
+            window.add_btn.setEnabled(True)
             window.note_title.setEnabled(True)
             
             editor.show()
@@ -523,7 +523,7 @@ def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     editor.setPlainText(window.lock_screen)
     editor.setReadOnly(True)
     window.status_label.setText("Locked")
-    window.add_note_btn.setEnabled(False)
+    window.add_btn.setEnabled(False)
 
     lock_btn.hide()
     unlock_btn.setEnabled(True)

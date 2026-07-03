@@ -265,7 +265,7 @@ class PassCoreUI(QMainWindow):
         """)
 
         # Note btn
-        self.add_note_btn.setStyleSheet(f"""
+        self.add_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.i};
                 color: {self.t};
@@ -710,13 +710,13 @@ class PassCoreUI(QMainWindow):
 
         # Left Panel for Notes
         self.note_title.textChanged.connect(self.rename_note)
-        self.add_note_btn = QPushButton("+")
+        self.add_btn = QPushButton("+")
         
         self.note_list = QListWidget()
         self.note_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.note_list.customContextMenuRequested.connect(self.item_context_menu)
 
-        self.add_note_btn.clicked.connect(self.add_item)
+        self.add_btn.clicked.connect(self.add_item)
         self.note_list.addItem("Untitled Note")
         self.note_list.currentRowChanged.connect(self.load_note)
         self.note_list.itemClicked.connect(self.load_album)
@@ -724,7 +724,7 @@ class PassCoreUI(QMainWindow):
 
         # Notes Layout
         left_layout = QVBoxLayout()
-        left_layout.addWidget(self.add_note_btn)
+        left_layout.addWidget(self.add_btn)
         left_layout.addWidget(self.note_list)
 
         right_layout = QVBoxLayout()
@@ -851,7 +851,9 @@ class PassCoreUI(QMainWindow):
 
     # Credentials
     def show_credentials(self):
+        self.reset_image_view()
         self.current_section = "credentials"
+        self.add_btn.setText("+ Note")
         self.note_title.show()
         self.editor.show()
 
@@ -873,7 +875,9 @@ class PassCoreUI(QMainWindow):
 
     # Images
     def show_images(self):
+        self.reset_image_view()
         self.current_section = "images"
+        self.add_btn.setText("+ Image")
         self.note_title.hide()
         self.editor.hide()
 
@@ -892,14 +896,16 @@ class PassCoreUI(QMainWindow):
         
         album_name = current.text()
         files, _ = QFileDialog.getOpenFileNames(
-            self, "Import Images", str(Path.home() / "Pictures", "Images (*.png *.jpg *.jpeg *.bmp *.webp *.gif)")
+            self, "Import Images", str(Path.home() / "Pictures"), "Images (*.png *.jpg *.jpeg *.bmp *.webp *.gif)"
         )
-        if not files: 
+        if not files:
             return
         
+        last_file = None
         for file in files:
             PassCoreImage.import_image(Path(file), album_name)
         
+        last_file = Path(file).name
         self.load_album(current)
 
     # Open selected images
@@ -936,10 +942,10 @@ class PassCoreUI(QMainWindow):
             l_albums = json.load(albums)
         
         for album_name in sorted(l_albums["albums"]):
-            if self.note_list.count():
-                self.note_list.setCurrentRow(0)
-
             self.note_list.addItem(album_name)
+
+        if self.note_list.count():
+            self.note_list.setCurrentRow(0)
 
     # Load images inside albums (thumbnail)
     def load_album(self, item):
@@ -967,36 +973,59 @@ class PassCoreUI(QMainWindow):
             self.gallery_layout.addWidget(thumb)
 
     def add_album(self):
-        if not IMAGES_META.exists():
-            data = {"albums": {}}
-        
-        else:
-            name, ok = QInputDialog.getText(
-                self, "PassCore", "Album Name"
-            )
-            if not ok or not name.strip():
-                return
-            
-            with open(IMAGES_META, "r", encoding="utf-8") as f:
-                data = json.load(f)
+        album_name, ok = QInputDialog.getText(
+            self, "PassCore", "Album Name"
+        )
+        if not ok or not album_name.strip():
+            return
 
-            if name in data["albums"]:
-                QMessageBox.information(
-                    self, "PassCore", "Album already exists."
-                )
-                return
-            data["albums"][name] = {}
-            with open(IMAGES_META, "w", encoding="utf-8") as a_meta:
-                json.dump(data, a_meta, indent=4)
-            
-            self.load_albums()
+        if not IMAGES_META.exists():
+            data = {
+                "albums": {}
+            }
+        else:
+            with open(IMAGES_META, "r", encoding="utf-8") as l_init:
+                data = json.load(l_init)
+
+        if album_name in data["albums"]: # Album already exists.?
+            QMessageBox.information(
+                self, "PassCore", "Album already exists."
+            )
+            return
+
+        data["albums"][album_name] = {} # Create Empty Album.!
+        with open(IMAGES_META, "w", encoding="utf-8") as a_meta:
+            json.dump(data, a_meta, indent=4)
+        
+        self.load_albums()
+
+        items = self.note_list.findItems(album_name, Qt.MatchFlag.MatchExactly)
+        if items:
+            self.note_list.setCurrentItem(items[0])
 
     def add_item(self):
         if self.current_section == "credentials":
             self.add_note()
         
         elif self.current_section == "images":
-            self.add_album()
+            if self.note_list.currentItem() is None:
+                self.add_album()
+            else:
+                self.import_images()
+
+    def rename_item(self):
+        if self.current_section == "credentials":
+            self.rename_note()
+        
+        elif self.current_section == "images":
+            self.rename_album()
+
+    def delete_itme(self):
+        if self.current_section == "credentials":
+            self.delete_note()
+        
+        elif self.current_section == "images":
+            self.delete_album()
     
     def rename_album(self, old_name):
         new_name, ok = QInputDialog.getText(
@@ -1051,6 +1080,23 @@ class PassCoreUI(QMainWindow):
             widget = item.widget()
             if widget:
                 widget.deleteLater()
+
+    def reset_image_view(self):
+        # Leave image_preview mode.
+        self.preview_widget.hide()
+        self.gallery_scroll.hide()
+
+        # Remove all thumbnails and clear the gallery.
+        self.clear_gallery()
+        self.image_preview.clear()
+
+        # Clear preview information.
+        self.preview_name.clear()
+        self.preview_size.clear()
+        self.preview_resolution.clear()
+        self.preview_created.clear()
+
+        self.note_list.clearSelection() # Remove selected album
 
     def show_documents(self):
         pass
@@ -1277,13 +1323,17 @@ class PassCoreUI(QMainWindow):
             return
         
         menu = QMenu(self)
+        add = menu.addAction("Add Album")
         rename = menu.addAction("Rename Album")
         delete = menu.addAction("Delete Album")
 
         action = menu.exec(
             self.note_list.mapToGlobal(pos)
         )
-        if action == rename:
+        if action == add:
+            self.add_album()
+
+        elif action == rename:
             self.rename_album(item.text())
 
         elif action == delete:
