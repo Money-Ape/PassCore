@@ -8,6 +8,7 @@ from cryptography.exceptions import InvalidTag
 from PySide6.QtWidgets import(QApplication, QMessageBox)
 from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
+from pcvmenu.images import PassCoreImage
 
 def resource_path(relative_path):
     try:
@@ -271,6 +272,9 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
         window.note_title.setEnabled(False)
         window.slide_menu.hide()
 
+        PassCoreImage.preview_cache.clear()
+        PassCoreImage.merge_cache.clear()
+
         lock_btn.setEnabled(False)
         lock_btn.hide()
         save_btn.setEnabled(False)
@@ -530,6 +534,9 @@ def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     save_btn.hide()
     close_btn.setEnabled(True)
     window.slide_menu.hide()
+
+    PassCoreImage.preview_cache.clear()
+    PassCoreImage.merge_cache.clear()
 
     unlock_btn.show()
     window.key = None

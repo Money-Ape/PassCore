@@ -1,10 +1,10 @@
 import sys, os, subprocess, json, ctypes
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QGridLayout, QScrollArea)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QScrollArea)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal
-from backup import create_backup, restore_backup, META_FILE
+from backup import create_backup, restore_backup, META_FILE, secure_del_tree
 from passgen import generate_password
 from health import vault_health
 from file import import_txt, import_pcv, export_pcv
@@ -12,6 +12,7 @@ from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
 from pcvmenu.images import PassCoreImage, IMAGES_META
 from flowlayout import FlowLayout
+from collections import defaultdict
 
 def resource_path(relative_path):
     try:
@@ -654,9 +655,11 @@ class PassCoreUI(QMainWindow):
 
         # Images Gallery
         self.gallery_widget = QWidget()
-        self.gallery_layout = FlowLayout(spacing=10)
-        self.gallery_layout.setContentsMargins(5, 5, 5, 5)
+        self.gallery_layout = QVBoxLayout()
+        self.gallery_layout.setContentsMargins(8, 8, 8, 8)
+        self.gallery_layout.setSpacing(20)
 
+        self.gallery_layout.addStretch()
         self.gallery_widget.setLayout(self.gallery_layout)
 
         self.gallery_scroll = QScrollArea()
@@ -886,6 +889,27 @@ class PassCoreUI(QMainWindow):
 
         self.load_albums()
 
+    def create_day_section(self, title):
+        header = QLabel(title)
+        header.setStyleSheet(f"""
+            QLabel {{
+                color: {self.t};
+                font-size: 18px;
+                font-weight: bold;
+                padding: 6px;
+            }}
+        """)
+        
+        flow_widget = QWidget()
+        flow = FlowLayout(flow_widget, spacing=8)
+        flow_widget.setLayout(flow)
+
+        stretch_index = max(0, self.gallery_layout.count() - 1)
+        self.gallery_layout.insertWidget(stretch_index, header)
+        self.gallery_layout.insertWidget(stretch_index + 1, flow_widget)
+
+        return flow
+
     def import_images(self):
         current = self.note_list.currentItem()
         if current is None:
@@ -901,16 +925,26 @@ class PassCoreUI(QMainWindow):
         if not files:
             return
         
-        last_file = None
-        for file in files:
+        progress = QProgressDialog(
+            "Importing Images to PassCore", None, 0, len(files), self
+        )
+        progress.setWindowTitle("PassCore Vault")
+        progress.setMinimumDuration(0)
+        progress.setAutoClose(True)
+        progress.setAutoReset(True)
+        progress.setCancelButton(None)
+
+        for i ,file in enumerate(files, start=1):
+            progress.setValue(i - 1)
+            progress.setLabelText(f"Importing [{i}/{len(files)}]\n{Path(file).name}")
+            QApplication.processEvents()
             PassCoreImage.import_image(Path(file), album_name)
         
-        last_file = Path(file).name
+        progress.setValue(len(files))
         self.load_album(current)
 
     # Open selected images
-    def open_selected_image(self, filename):
-        album_name = self.note_list.currentItem().text()
+    def open_selected_image(self, filename, album_name):
         pix = PassCoreImage.load_preview(filename, album_name)
         self.image_preview.setPixmap(
             pix.scaled(
@@ -954,23 +988,49 @@ class PassCoreUI(QMainWindow):
 
         with open(IMAGES_META, "r", encoding="utf-8") as album:
             l_album = json.load(album)
-        
+
         album = l_album["albums"][album_name]
+        if not album:
+            return
 
-        for filename in sorted(album):
-            pix = PassCoreImage.load_preview(filename, album_name)
-            if pix is None:
-                continue
+        timeline = defaultdict(list)
+        for filename, info in album.items():
+            created = datetime.strptime(info["created_at"], "%d-%m-%Y %I:%M:%S %p")
+            day = created.strftime("%d %B %Y")
+            timeline[day].append((created, filename))
 
-            thumb = ImageLabel(filename, album_name)
-            thumb.clicked.connect(self.open_selected_image)
-            thumb.setPixmap(
-                pix.scaledToHeight(
-                180, Qt.TransformationMode.SmoothTransformation
+        days = sorted(
+            timeline.keys(), key=lambda d: datetime.strptime(d, "%d %B %Y"), reverse=True
+        )
+        today = datetime.today().date()
+
+        for day in days:
+            header_date = datetime.strptime(day, "%d %B %Y").date()
+            images = sorted(timeline[day], reverse=True)
+            if header_date == today:
+                text = f"Today ({len(images)})"
+
+            elif (today - header_date).days == 1:
+                text = f"Yesterday ({len(images)})"
+
+            else:
+                text = f"{day} ({len(images)})"
+            
+            day_flow = self.create_day_section(text)
+
+            for _, filename in images:
+                pix = PassCoreImage.load_preview(filename, album_name)
+                if pix is None:
+                    continue
+
+                thumb = ImageLabel(filename, album_name)
+                thumb.clicked.connect(self.open_selected_image)
+                thumb.setPixmap(
+                    pix.scaledToHeight(
+                    180, Qt.TransformationMode.SmoothTransformation
+                    )
                 )
-            )
-            thumb.setScaledContents(False)
-            self.gallery_layout.addWidget(thumb)
+                day_flow.addWidget(thumb)
 
     def add_album(self):
         album_name, ok = QInputDialog.getText(
@@ -1047,14 +1107,6 @@ class PassCoreUI(QMainWindow):
         self.load_albums()
 
     def delete_album(self, album):
-        if album == "Default":
-            QMessageBox.information(
-                self,
-                "PassCore",
-                "Default album cannot be deleted."
-            )
-            return
-
         reply=QMessageBox.question(
             self,
             "Delete Album",
@@ -1065,6 +1117,11 @@ class PassCoreUI(QMainWindow):
 
         with open(IMAGES_META,"r") as f:
             data=json.load(f)
+        
+        not_empty = data["albums"][album]
+        if not_empty:
+            QMessageBox.information(self, "PassCore Album", "Album has images.\ncannot be delete.!")
+            return
 
         del data["albums"][album]
         with open(IMAGES_META,"w") as f:
@@ -1077,10 +1134,16 @@ class PassCoreUI(QMainWindow):
     def clear_gallery(self):
         while self.gallery_layout.count():
             item = self.gallery_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
-
+            if item.widget():
+                item.widget().deleteLater()
+            
+            elif item.layout():
+                while item.layout().count():
+                        child = item.layout().takeAt(0)
+                        if child.widget():
+                            child.widget().deleteLater()
+        self.gallery_layout.addStretch()
+            
     def reset_image_view(self):
         # Leave image_preview mode.
         self.preview_widget.hide()
@@ -1568,6 +1631,36 @@ class PassCoreUI(QMainWindow):
         QMessageBox.information(
             self,"PassCore", f"Auto-Lock Timer set to {minutes} minute(s)."
         )
+class TimeLineLabel(QLabel):
+    def __init__(self, text):
+        super().__init__(text)
+
+        self.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-weight: bold;
+                padding: 10px 4px;
+            }
+        """)
+class ImageLabel(QLabel):
+    clicked = Signal(str, str)
+    def __init__(self, filename, album_name, parent=None):
+        super().__init__(parent)
+        self.filename = filename
+        self.album_name = album_name
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def sizeHint(self):
+        if self.pixmap():
+            return self.pixmap().size()
+
+        return QSize(180, 180)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit(self.filename, self.album_name)
+
+        super().mousePressEvent(event)
 
 class ThemeDialog(QDialog):
     def __init__(self, parent=None):
@@ -1644,26 +1737,6 @@ class ThemeDialog(QDialog):
         layout.addLayout(btn_layout)
 
         self.setLayout(layout)
-
-class ImageLabel(QLabel):
-    clicked = Signal(str, str)
-    def __init__(self, filename, album_name, parent=None):
-        super().__init__(parent)
-        self.filename = filename
-        self.album_name = album_name
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-    def sizeHint(self):
-        if self.pixmap():
-            return self.pixmap().size()
-
-        return QSize(180, 180)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit(self.filename, self.album_name)
-
-        super().mousePressEvent(event)
 
 class PasswordDialog(QDialog):
     def __init__(self, title="PassCore Vault", confirm=False):

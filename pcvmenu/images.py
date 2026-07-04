@@ -1,7 +1,7 @@
 from PIL import Image
 import sys, os, platform, mimetypes, uuid, hashlib, json
 from pathlib import Path
-from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PySide6.QtGui import QPixmap
 from datetime import datetime
 from io import BytesIO
@@ -76,6 +76,10 @@ def sha256_blob(shafile_path):
     return hh.hexdigest() # return hexadecimal hash string.!
 
 class PassCoreImage(QMainWindow):
+    preview_cache = {}
+    merge_cache = {}
+    MAX_CACHE = 100
+
     def __init__(self):
         super().__init__()
     
@@ -124,6 +128,10 @@ class PassCoreImage(QMainWindow):
             with open(IMAGES_META, "w") as f_init:
                 json.dump(image_meta, f_init, indent=4)
 
+            cache_key = f"{album_name}/{image_path.name}"
+            PassCoreImage.preview_cache.pop(cache_key, None)
+            PassCoreImage.merge_cache.pop(cache_key, None)
+
             PassCoreImage.split_image_bin(image_info, album_name, chunk_size=1024)
             PassCoreImage.blob_integrity_verify(image_info, album_name)
 
@@ -159,7 +167,11 @@ class PassCoreImage(QMainWindow):
                     old_meta["albums"][album_name][image_path.name] = image_data
                     with open(IMAGES_META, "w", encoding="utf-8") as update_meta:
                         json.dump(old_meta, update_meta, indent=4)
-                    
+
+                    cache_key = f"{album_name}/{image_path.name}"
+                    PassCoreImage.preview_cache.pop(cache_key, None)
+                    PassCoreImage.merge_cache.pop(cache_key, None)
+
                     PassCoreImage.split_image_bin(image_info, album_name, chunk_size=1024)
                     PassCoreImage.blob_integrity_verify(image_info, album_name)
                     
@@ -183,11 +195,19 @@ class PassCoreImage(QMainWindow):
                 with open(IMAGES_META, "w", encoding="utf-8") as update_meta:
                     json.dump(old_meta, update_meta, indent=4)
 
+                cache_key = f"{album_name}/{image_path.name}"
+                PassCoreImage.preview_cache.pop(cache_key, None)
+                PassCoreImage.merge_cache.pop(cache_key, None)
+
                 PassCoreImage.split_image_bin(image_info, album_name, chunk_size=1024)
                 PassCoreImage.blob_integrity_verify(image_info, album_name)
 
     @staticmethod
     def merge_image_bin(filename, album_name):
+        cache_key = f"{album_name}/{filename}"
+        if cache_key in PassCoreImage.merge_cache:
+            return PassCoreImage.merge_cache[cache_key]
+
         with open(IMAGES_META, "r") as ijson:
             merge_i = json.load(ijson)
         
@@ -212,10 +232,20 @@ class PassCoreImage(QMainWindow):
         if merge_hash != merge_i["albums"][album_name][filename]["sha256"]:
             raise FileNotFoundError(f"Merged image: {image_id}; failed integrity verification is corrupted.!")
 
-        return bytes(merge_data)
+        image_bytes = bytes(merge_data)
+        PassCoreImage.merge_cache[cache_key] = image_bytes
+        if len(PassCoreImage.merge_cache) > PassCoreImage.MAX_CACHE:
+            old = next(iter(PassCoreImage.merge_cache))
+            del PassCoreImage.merge_cache[old]
+
+        return image_bytes
 
     @staticmethod
     def load_preview(filename, album_name):
+        cache_key = f"{album_name}/{filename}"
+        if cache_key in PassCoreImage.preview_cache:
+            return PassCoreImage.preview_cache[cache_key]
+
         image_bytes = PassCoreImage.merge_image_bin(filename, album_name)
         if image_bytes is None:
             return None
@@ -226,6 +256,11 @@ class PassCoreImage(QMainWindow):
         img.save(out, format="PNG")
         pixmap = QPixmap()
         pixmap.loadFromData(out.getvalue())
+        PassCoreImage.preview_cache[cache_key] = pixmap
+        if len(PassCoreImage.preview_cache) > PassCoreImage.MAX_CACHE: # Delete old cache if exceeds length.!
+            old = next(iter(PassCoreImage.preview_cache))
+            del PassCoreImage.preview_cache[old]
+
         return pixmap
 
     def blob_integrity_verify(image_info, album_name):

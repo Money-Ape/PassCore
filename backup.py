@@ -61,6 +61,8 @@ CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
 PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
 SALT_FILE = PASSCORE_DIR / "vault.salt"
 META_FILE = PASSCORE_DIR / "meta.json"
+SETTINGS = PASSCORE_DIR / "settings.json"
+IMAGES_META = PASSCORE_DIR / "images_index.json"
 
 BACKUP_ROOT = Path.home() / "Documents" / "PassCore Backups" # PassCore Backups root
 BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
@@ -73,6 +75,8 @@ def create_backup():
     with zipfile.ZipFile(zip_dir, "w", compression=zipfile.ZIP_DEFLATED) as backto_zip: # writes splitted blobs into zipfile for backup
         backto_zip.write(SALT_FILE, arcname=SALT_FILE.name)
         backto_zip.write(META_FILE, arcname=META_FILE.name)
+        backto_zip.write(SETTINGS, arcname=SETTINGS.name)
+        backto_zip.write(IMAGES_META, arcname=IMAGES_META.name)
 
         for file in CONTAINER_DIR.rglob("*"):
             if file.is_file():
@@ -113,6 +117,8 @@ def restore_backup(window):
         backfrom_zip.extractall(CONTAINER_DIR) 
         shutil.move(CONTAINER_DIR / "meta.json", PASSCORE_DIR)
         shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
+        shutil.move(CONTAINER_DIR / "settings.json", PASSCORE_DIR)
+        shutil.move(CONTAINER_DIR / "images_index.json", PASSCORE_DIR)
 
     print(f"Recovered from {backup_file.name}")
 
