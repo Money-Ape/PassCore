@@ -942,6 +942,7 @@ class PassCoreUI(QMainWindow):
             import_image(Path(file), album_name, self.vault_key)
         
         progress.setValue(len(files))
+        self.update_album_size(album_name)
         self.load_album(current)
 
     # Open selected images
@@ -986,6 +987,7 @@ class PassCoreUI(QMainWindow):
     def load_album(self, item):
         self.clear_gallery()
         album_name = item.text()
+        self.update_album_size(album_name)
 
         with open(IMAGES_META, "r") as album:
             l_album = json.load(album)
@@ -1032,6 +1034,21 @@ class PassCoreUI(QMainWindow):
                     )
                 )
                 day_flow.addWidget(thumb)
+
+    def update_album_size(self, album_name):
+        if not IMAGES_META.exists():
+            self.size_label.setText("Size\n0 Bytes")
+            return
+
+        with open(IMAGES_META, "r") as s:
+            size_meta = json.load(s)
+
+        album_size = size_meta["albums"].get(album_name, {})
+        total_size = sum(
+            image["size"]
+            for image in album_size.values()
+        )
+        self.size_label.setText(f"Size:\n{self.size_calc(total_size)}")
 
     def add_album(self):
         album_name, ok = QInputDialog.getText(
@@ -1106,6 +1123,7 @@ class PassCoreUI(QMainWindow):
             json.dump(data, r_album, indent=4)
 
         self.load_albums()
+        self.update_album_size(new_name)
 
     def delete_album(self, album):
         reply=QMessageBox.question(
@@ -1129,6 +1147,7 @@ class PassCoreUI(QMainWindow):
             json.dump(data,f,indent=4)
 
         self.load_albums()
+        self.update_album_size(album)
         if self.note_list.count():
             self.note_list.setCurrentRow(0)
 
