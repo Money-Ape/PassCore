@@ -8,7 +8,7 @@ from cryptography.exceptions import InvalidTag
 from PySide6.QtWidgets import(QApplication, QMessageBox)
 from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
-from pcvmenu.images import PassCoreImage
+from pcvmenu.images import preview_cache, merge_cache
 
 def resource_path(relative_path):
     try:
@@ -250,7 +250,7 @@ def decrypt_vault(key, encrypted_blobs):
             return json.loads(payload)
                 
     except FileNotFoundError as e1:
-        return InvalidTag("Unable to decrypt the vault.!")
+        return InvalidTag("Unable to decrypt the vault.!\n", e1)
 
 def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):    
     reply = QMessageBox.question(
@@ -272,8 +272,8 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
         window.note_title.setEnabled(False)
         window.slide_menu.hide()
 
-        PassCoreImage.preview_cache.clear()
-        PassCoreImage.merge_cache.clear()
+        preview_cache.clear()
+        merge_cache.clear()
 
         lock_btn.setEnabled(False)
         lock_btn.hide()
@@ -352,6 +352,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 json.dump(vault_meta, meta_f, indent=4)
 
             window.key = key
+            window.vault_key = key
             editor.show()
             save_btn.show()
             close_btn.show()
@@ -411,6 +412,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 QMessageBox.information(window, "PassCore", "Vault is empty.!")
 
                 window.key = key
+                window.vault_key = key
                 unlock_btn.hide()
                 editor.clear()
                 editor.setReadOnly(False)
@@ -471,6 +473,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
         ) 
         window.key = key
+        window.vault_key = key
         try:
             vault_notes = decrypt_vault(key, encrypted_blobs)
             
@@ -535,8 +538,8 @@ def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     close_btn.setEnabled(True)
     window.slide_menu.hide()
 
-    PassCoreImage.preview_cache.clear()
-    PassCoreImage.merge_cache.clear()
+    preview_cache.clear()
+    merge_cache.clear()
 
     unlock_btn.show()
     window.key = None

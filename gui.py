@@ -4,13 +4,13 @@ from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QScrollArea)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal
-from backup import create_backup, restore_backup, META_FILE, secure_del_tree
+from backup import create_backup, restore_backup, META_FILE
 from passgen import generate_password
 from health import vault_health
 from file import import_txt, import_pcv, export_pcv
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
-from pcvmenu.images import PassCoreImage, IMAGES_META
+from pcvmenu.images import import_image, load_preview, IMAGES_META
 from flowlayout import FlowLayout
 from collections import defaultdict
 
@@ -23,8 +23,9 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class PassCoreUI(QMainWindow):
-    def __init__(self):
+    def __init__(self, vault_key=None):
         super().__init__()
+        self.vault_key = vault_key
 
         print("MEIPASS:", getattr(sys, "_MEIPASS", "NOT SET"))
         print("ICON:", resource_path("assets/PassCore.ico"))
@@ -938,14 +939,14 @@ class PassCoreUI(QMainWindow):
             progress.setValue(i - 1)
             progress.setLabelText(f"Importing [{i}/{len(files)}]\n{Path(file).name}")
             QApplication.processEvents()
-            PassCoreImage.import_image(Path(file), album_name)
+            import_image(Path(file), album_name, self.vault_key)
         
         progress.setValue(len(files))
         self.load_album(current)
 
     # Open selected images
     def open_selected_image(self, filename, album_name):
-        pix = PassCoreImage.load_preview(filename, album_name)
+        pix = load_preview(self.vault_key, filename, album_name)
         self.image_preview.setPixmap(
             pix.scaled(
                 self.image_preview.size(),
@@ -953,7 +954,7 @@ class PassCoreUI(QMainWindow):
                 Qt.TransformationMode.SmoothTransformation
             )
         )
-        with open(IMAGES_META, "r", encoding="utf-8") as open_image:
+        with open(IMAGES_META, "r") as open_image:
             data = json.load(open_image)
 
         info = data["albums"][album_name][filename]
@@ -972,7 +973,7 @@ class PassCoreUI(QMainWindow):
         if not IMAGES_META.exists():
             return
         
-        with open(IMAGES_META, "r", encoding="utf-8") as albums:
+        with open(IMAGES_META, "r") as albums:
             l_albums = json.load(albums)
         
         for album_name in sorted(l_albums["albums"]):
@@ -986,7 +987,7 @@ class PassCoreUI(QMainWindow):
         self.clear_gallery()
         album_name = item.text()
 
-        with open(IMAGES_META, "r", encoding="utf-8") as album:
+        with open(IMAGES_META, "r") as album:
             l_album = json.load(album)
 
         album = l_album["albums"][album_name]
@@ -1019,7 +1020,7 @@ class PassCoreUI(QMainWindow):
             day_flow = self.create_day_section(text)
 
             for _, filename in images:
-                pix = PassCoreImage.load_preview(filename, album_name)
+                pix = load_preview(self.vault_key, filename, album_name)
                 if pix is None:
                     continue
 
@@ -1044,7 +1045,7 @@ class PassCoreUI(QMainWindow):
                 "albums": {}
             }
         else:
-            with open(IMAGES_META, "r", encoding="utf-8") as l_init:
+            with open(IMAGES_META, "r") as l_init:
                 data = json.load(l_init)
 
         if album_name in data["albums"]: # Album already exists.?
@@ -1054,7 +1055,7 @@ class PassCoreUI(QMainWindow):
             return
 
         data["albums"][album_name] = {} # Create Empty Album.!
-        with open(IMAGES_META, "w", encoding="utf-8") as a_meta:
+        with open(IMAGES_META, "w") as a_meta:
             json.dump(data, a_meta, indent=4)
         
         self.load_albums()
@@ -1094,14 +1095,14 @@ class PassCoreUI(QMainWindow):
         if not ok or not new_name.strip():
             return
 
-        with open(IMAGES_META, "r", encoding="utf-8") as old_album:
+        with open(IMAGES_META, "r") as old_album:
             data = json.load(old_album)
 
         if new_name in data["albums"]:
             QMessageBox.information(self, "PassCore", "Album already exists.!")
 
         data["albums"][new_name] = data["albums"].pop(old_name)
-        with open(IMAGES_META, "w", encoding="utf-8") as r_album:
+        with open(IMAGES_META, "w") as r_album:
             json.dump(data, r_album, indent=4)
 
         self.load_albums()
