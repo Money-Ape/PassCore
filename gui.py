@@ -478,6 +478,19 @@ class PassCoreUI(QMainWindow):
             }}
         """)
 
+        # Image Selection Label.
+        self.selection_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {self.i};
+                color: {self.t};
+                border: 1px solid {self.b};
+                border-radius: 10px;
+                padding: 6px 14px;
+                font-size: 10pt;
+                font-weight: bold;
+            }}
+        """)
+
         # Lock Button
         self.lock_btn.setStyleSheet(f"""
             QPushButton {{
@@ -667,6 +680,10 @@ class PassCoreUI(QMainWindow):
         self.gallery_scroll = QScrollArea()
         self.gallery_scroll.setWidgetResizable(True)
         self.gallery_scroll.setWidget(self.gallery_widget)
+
+        self.selection_label = QLabel(self.gallery_scroll.viewport())
+        self.selection_label.hide()
+        self.selection_label.adjustSize()
 
         self.gallery_scroll.hide()
         
@@ -989,6 +1006,9 @@ class PassCoreUI(QMainWindow):
     # Load images inside albums (thumbnail)
     def load_album(self, item):
         self.clear_gallery()
+        self.selected_images.clear()
+        self.update_selection_label()
+
         album_name = item.text()
         self.update_album_size(album_name)
 
@@ -1046,6 +1066,8 @@ class PassCoreUI(QMainWindow):
             self.selected_images.remove(key)
         else:
             self.selected_images.add(key)
+        
+        self.update_selection_label()
     
     def show_image_menu(self, filename, album_name, pos):
         menu = QMenu(self)
@@ -1059,7 +1081,15 @@ class PassCoreUI(QMainWindow):
                     self.delete_image(album, image)
 
                 self.selected_images.clear()
+                self.update_selection_label()
+
             else:
+                reply = QMessageBox.question(
+                    self, f"Delete Image", f"Are you sure?\nDelete {filename}?"
+                )
+                if reply != QMessageBox.Yes:
+                    return
+
                 self.delete_image(album_name, filename)
         
         elif chosen == rename:
@@ -1079,6 +1109,25 @@ class PassCoreUI(QMainWindow):
             for image in album_size.values()
         )
         self.size_label.setText(f"Size:\n{self.size_calc(total_size)}")
+
+    def update_selection_label(self):
+        count = len(self.selected_images)
+        if count == 0:
+            self.selection_label.hide()
+            return
+        
+        if count == 1:
+            text = "1 Image Selected."
+        else:
+            text = f"{count} Images Selected..."
+        
+        self.selection_label.setText(text)
+        self.selection_label.adjustSize()
+        margin = 15
+        
+        self.selection_label.move(margin, self.gallery_scroll.height() - self.selection_label.height() - margin)
+        self.selection_label.show()
+        self.selection_label.raise_()
 
     def add_album(self):
         album_name, ok = QInputDialog.getText(
@@ -1244,6 +1293,7 @@ class PassCoreUI(QMainWindow):
                         child = item.layout().takeAt(0)
                         if child.widget():
                             child.widget().deleteLater()
+
         self.gallery_layout.addStretch()
             
     def reset_image_view(self):
@@ -1251,8 +1301,10 @@ class PassCoreUI(QMainWindow):
         self.preview_widget.hide()
         self.gallery_scroll.hide()
 
-        # Remove all thumbnails and clear the gallery.
+        # Remove all thumbnails and clear the gallery along with the selection label.
         self.clear_gallery()
+        self.selected_images.clear()
+        self.update_selection_label()
         self.image_preview.clear()
 
         # Clear preview information.
@@ -1281,6 +1333,7 @@ class PassCoreUI(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         note_geo = self.note_list.geometry()
+        self.update_selection_label()
 
         self.slide_menu.setGeometry(
             self.slide_menu.x(),
@@ -1752,14 +1805,6 @@ class ImageLabel(QLabel):
     def __init__(self, filename, album_name, parent=None):
         super().__init__(parent)
 
-        current_theme = (
-            parent.settings["theme"]
-            if parent
-            else "default"
-        )
-        theme = THEMES[current_theme]
-        self.i = theme["interactive"]
-
         self.filename = filename
         self.album_name = album_name
         self.selected = False
@@ -1793,7 +1838,7 @@ class ImageLabel(QLabel):
         if self.selected:
             self.setStyleSheet(f"""
                 QLabel {{
-                    border:3px solid {self.i};
+                    border:3px solid #FFC107;
                     border-radius:8px;
                 }}
             """)
