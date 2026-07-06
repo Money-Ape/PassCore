@@ -4,13 +4,13 @@ from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QScrollArea)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal
-from backup import create_backup, restore_backup, META_FILE
+from backup import create_backup, restore_backup, META_FILE, secure_del_tree
 from passgen import generate_password
 from health import vault_health
 from file import import_txt, import_pcv, export_pcv
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
-from pcvmenu.images import import_image, load_preview, IMAGES_META
+from pcvmenu.images import import_image, load_preview, IMAGES_META, CONTAINER_DIR
 from flowlayout import FlowLayout
 from collections import defaultdict
 
@@ -88,6 +88,7 @@ class PassCoreUI(QMainWindow):
             "wwwwwwwwwwwwwwwww wwwwwwwwwwwwwwwww wwwwww www\n"
         )
         self.update_vault_size()
+        self.selected_images = set()
         self.vault_text = None
         self.editor.setPlainText(self.lock_screen)
         self.key = None
@@ -860,6 +861,7 @@ class PassCoreUI(QMainWindow):
         self.add_btn.setText("+ Note")
         self.note_title.show()
         self.editor.show()
+        self.save_label.show()
 
         self.gallery_scroll.hide()
         self.preview_widget.hide()
@@ -884,6 +886,7 @@ class PassCoreUI(QMainWindow):
         self.add_btn.setText("+ Image")
         self.note_title.hide()
         self.editor.hide()
+        self.save_label.hide()
 
         self.gallery_scroll.show()
         self.preview_widget.hide()
@@ -1028,12 +1031,39 @@ class PassCoreUI(QMainWindow):
 
                 thumb = ImageLabel(filename, album_name)
                 thumb.clicked.connect(self.open_selected_image)
+                thumb.selectionChanged.connect(self.toggle_image_selection)
+                thumb.contextRequested.connect(self.show_image_menu)
                 thumb.setPixmap(
                     pix.scaledToHeight(
                     180, Qt.TransformationMode.SmoothTransformation
                     )
                 )
                 day_flow.addWidget(thumb)
+
+    def toggle_image_selection(self, filename, album_name):
+        key = (album_name, filename)
+        if key in self.selected_images:
+            self.selected_images.remove(key)
+        else:
+            self.selected_images.add(key)
+    
+    def show_image_menu(self, filename, album_name, pos):
+        menu = QMenu(self)
+        delete = menu.addAction("Delete")
+        rename = menu.addAction("Rename")
+
+        chosen = menu.exec(pos)
+        if chosen == delete:
+            if self.selected_images:
+                for album, image in list(self.selected_images):
+                    self.delete_image(album, image)
+
+                self.selected_images.clear()
+            else:
+                self.delete_image(album_name, filename)
+        
+        elif chosen == rename:
+            self.rename_image(album_name, filename)
 
     def update_album_size(self, album_name):
         if not IMAGES_META.exists():
@@ -1090,20 +1120,6 @@ class PassCoreUI(QMainWindow):
                 self.add_album()
             else:
                 self.import_images()
-
-    def rename_item(self):
-        if self.current_section == "credentials":
-            self.rename_note()
-        
-        elif self.current_section == "images":
-            self.rename_album()
-
-    def delete_itme(self):
-        if self.current_section == "credentials":
-            self.delete_note()
-        
-        elif self.current_section == "images":
-            self.delete_album()
     
     def rename_album(self, old_name):
         new_name, ok = QInputDialog.getText(
@@ -1147,9 +1163,75 @@ class PassCoreUI(QMainWindow):
             json.dump(data,f,indent=4)
 
         self.load_albums()
-        self.update_album_size(album)
+        self.clear_gallery()
         if self.note_list.count():
             self.note_list.setCurrentRow(0)
+
+    def rename_image(self, album_name, filename):
+        new_name, ok = QInputDialog.getText(
+            self, "Rename Image", "New Image name: ", text=filename
+        )
+        if not ok or not new_name.strip():
+            return
+        
+        new_name = new_name.strip()
+        old_ext = Path(filename).suffix
+        if Path(new_name).suffix == "":
+            new_name += old_ext
+        
+        with open(IMAGES_META, "r") as name:
+            r_name = json.load(name)
+        
+        album = r_name["albums"][album_name]
+        if new_name!= filename and new_name in album:
+            QMessageBox.warning(
+                self, "PassCore", "Image name already exists."
+            )
+            return
+        album[new_name] = album.pop(filename)
+        image_info = album[new_name]
+
+        # Modifies the image_index metadata.
+        album[new_name]["filename"] = new_name
+        album[new_name]["stem"] = Path(new_name).stem
+        album[new_name]["extension"] = Path(new_name).suffix
+
+        with open(IMAGES_META, "w") as modi_image:
+            json.dump(r_name, modi_image, indent=4)
+
+        # Modifies container metadata
+        container_meta = Path(CONTAINER_DIR / image_info["uuid"] / "metadata.json")
+        if container_meta.exists():
+            with open(container_meta, "r") as ctn_data:
+                ctn_meta = json.load(ctn_data)
+            
+            ctn_meta["filename"] = new_name
+            ctn_meta["stem"] = Path(new_name).stem
+            ctn_meta["extension"] = Path(new_name).suffix
+
+            with open(container_meta, "w") as modi_ctn:
+                json.dump(ctn_meta, modi_ctn,indent=4)
+        
+        current = self.note_list.currentItem() # Reload gallery.
+        if current:
+            self.load_album(current)
+        
+        QMessageBox.information(
+        self, "PassCore", "Image renamed successfully."
+        )
+
+    def delete_image(self, album_name, filename):
+        with open(IMAGES_META, "r") as del_img:
+            selc_image = json.load(del_img)
+        
+        ctn_id = selc_image["albums"][album_name][filename]
+        ctn_path = Path(CONTAINER_DIR / ctn_id["uuid"])
+        
+        secure_del_tree(ctn_path)
+        
+        del selc_image["albums"][album_name][filename]
+        with open(IMAGES_META, "w") as del_img:
+            json.dump(selc_image, del_img, indent=4)
 
     def clear_gallery(self):
         while self.gallery_layout.count():
@@ -1664,10 +1746,24 @@ class TimeLineLabel(QLabel):
         """)
 class ImageLabel(QLabel):
     clicked = Signal(str, str)
+    selectionChanged = Signal(str, str)
+    contextRequested = Signal(str, str, object)
+
     def __init__(self, filename, album_name, parent=None):
         super().__init__(parent)
+
+        current_theme = (
+            parent.settings["theme"]
+            if parent
+            else "default"
+        )
+        theme = THEMES[current_theme]
+        self.i = theme["interactive"]
+
         self.filename = filename
         self.album_name = album_name
+        self.selected = False
+
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def sizeHint(self):
@@ -1678,9 +1774,35 @@ class ImageLabel(QLabel):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit(self.filename, self.album_name)
+            if QApplication.keyboardModifiers() & Qt.KeyboardModifier.ControlModifier:
+                self.selected = not self.selected
+                self.update_selection_style()
+
+                self.selectionChanged.emit(self.filename, self.album_name)
+
+            else:
+                self.clicked.emit(self.filename, self.album_name)
+        
+        elif event.button() == Qt.MouseButton.RightButton:
+            self.contextRequested.emit(self.filename, self.album_name, event.globalPos())
+            
 
         super().mousePressEvent(event)
+
+    def update_selection_style(self):
+        if self.selected:
+            self.setStyleSheet(f"""
+                QLabel {{
+                    border:3px solid {self.i};
+                    border-radius:8px;
+                }}
+            """)
+        else:
+            self.setStyleSheet("""
+                QLabel{
+                    border:none;
+                }
+            """)
 
 class ThemeDialog(QDialog):
     def __init__(self, parent=None):
@@ -1690,14 +1812,12 @@ class ThemeDialog(QDialog):
         current_theme = (
             parent.settings["theme"]
             if parent
-            else "light_grey"
+            else "default"
         )
 
         theme = THEMES[current_theme]
-        win = theme["window"]
         w = theme["workspace"]
         i = theme["interactive"]
-        b = theme["border"]
         t = theme["text"]
 
         self.setStyleSheet(f"""
