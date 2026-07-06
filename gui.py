@@ -34,7 +34,7 @@ class PassCoreUI(QMainWindow):
         self.setWindowIcon(
             QIcon(resource_path("assets/PassCore.ico"))
         )
-        self.resize(1250, 850)
+        self.resize(1400, 850)
         self.settings = load_settings()
         self.autolock_timer = QTimer()
         self.WELCOME_TEXT = """
