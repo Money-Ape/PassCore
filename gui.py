@@ -2,7 +2,7 @@ import sys, os, subprocess, json, ctypes
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QScrollArea)
-from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent
+from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent, QColor, QTextCharFormat
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal
 from backup import create_backup, restore_backup, META_FILE, secure_del_tree
 from passgen import generate_password
@@ -115,6 +115,8 @@ class PassCoreUI(QMainWindow):
             "unlocked": "#4CAF50",
             "corrupted": "#E53935"
         }
+
+        self.SEARCH_HIGHLIGHT = theme["search"]
 
     def refresh_theme(self):
         self.settings = load_settings()
@@ -550,6 +552,10 @@ class PassCoreUI(QMainWindow):
                 background-color: {self.close_theme["hover"]};
             }}
         """)
+
+        # Refresh search highlight.
+        if self.search_input.isVisible() and self.matches:
+            self.goto_match()
 
     def open_theme_dialog(self):
         dialog = ThemeDialog(self)
@@ -1671,6 +1677,7 @@ class PassCoreUI(QMainWindow):
             self.current_match = -1
             self.match_label.setText("0 / 0")
             self.search_input.setFocus()
+            self.editor.setExtraSelections([])
 
     def search_rec(self):        
         text = self.search_input.text().strip()
@@ -1678,6 +1685,7 @@ class PassCoreUI(QMainWindow):
             self.matches = []
             self.current_match = -1
             self.match_label.setText("0 / 0")
+            self.editor.setExtraSelections([])
             return
         
         content = self.editor.toPlainText()
@@ -1698,6 +1706,10 @@ class PassCoreUI(QMainWindow):
             return
         
         self.current_match = 0
+        cursor = self.editor.textCursor()
+        cursor.setPosition(self.matches[0])
+        self.editor.setTextCursor(cursor)
+
         self.goto_match()
         self.match_label.setText(
             f"{self.current_match + 1}/{len(self.matches)}"
@@ -1705,18 +1717,31 @@ class PassCoreUI(QMainWindow):
 
     def goto_match(self):
         if not self.matches:
+            self.editor.setExtraSelections([])
             return
         
         pos = self.matches[self.current_match]
-        cursor = self.editor.textCursor()
+        cursor = QTextCursor(self.editor.document())
         cursor.setPosition(pos)
         cursor.movePosition(
             QTextCursor.MoveOperation.Right,
             QTextCursor.MoveMode.KeepAnchor,
             len(self.search_input.text())
         )
-        self.editor.setTextCursor(cursor)
-        # self.editor.setFocus()
+        selection = QTextEdit.ExtraSelection() # Highlight
+        selection.cursor = cursor
+
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor(self.SEARCH_HIGHLIGHT))
+        fmt.setForeground(QColor(self.w))
+        selection.format = fmt
+
+        self.editor.setExtraSelections([selection])
+        scroll_cursor = self.editor.textCursor()
+        scroll_cursor.setPosition(pos)
+        self.editor.setTextCursor(scroll_cursor)
+        self.editor.ensureCursorVisible()
+        QApplication.processEvents()
 
     def prev_match(self):
         if not self.matches:
