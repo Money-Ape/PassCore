@@ -1,0 +1,8 @@
+Getting Started
+---------------
+1. Launch PassCore.
+2. Create a new vault or unlock an existing one.
+3. Choose a strong master password.
+4. Start storing passwords and encrypted images.
+5. Enable automatic backups for additional protection.
+6. Enable Hide from Screen Option to prevent Screen capturing/recording.    

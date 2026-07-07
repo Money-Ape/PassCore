@@ -1,85 +1,113 @@
 # PassCore Architecture
+This Document describes the internal architecture of PassCore, including encryption, blob storage, integrity verification, image storage, backups, and the desktop application workflow.
 
 ```mermaid
 flowchart TD
 
 %% ==========================================================
-%% ENCRYPTION & STORAGE FLOW
+%% AUTHENTICATION & CRYPTOGRAPHY
 %% ==========================================================
 
 MP["Master Password"]
 A["Argon2id Key Derivation"]
-K["Vault Encryption Key"]
-E["AES-GCM Encryption"]
-RAM1["Encrypted Bytes (RAM)"]
-B["Blob Splitting"]
-C["Container Generation"]
+K["256-bit Vault Key"]
 
 MP --> A
 A --> K
-K --> E
-E --> RAM1
-RAM1 --> B
-B --> C
 
 %% ==========================================================
-%% DISTRIBUTED BLOB STORAGE
+%% DATA SOURCES
 %% ==========================================================
+
+VAULT["Vault Records"]
+IMAGE["Imported Images"]
+
+VAULT --> ENC
+IMAGE --> ENC
+
+ENC["AES-GCM Encryption"]
+
+K --> ENC
+
+ENC --> RAM1["Encrypted Bytes (RAM)"]
+
+%% ==========================================================
+%% STORAGE
+%% ==========================================================
+
+RAM1 --> SPLIT["Blob Splitting"]
+SPLIT --> CTN["Random Container Allocation"]
+
+CTN --> B1["container_id/blob_0000.bin"]
+CTN --> B2["container_id/blob_0001.bin"]
+CTN --> B3["container_id/blob_0002.bin"]
+CTN --> B4["..."]
 
 META["meta.json"]
+IMETA["images_index.json"]
 
-C --> D1["container_id/blob_0000.bin"]
-C --> D2["container_id/blob_0001.bin"]
-C --> D3["container_id/blob_0002.bin"]
-C --> D4["..."]
+META -. Vault Metadata .-> B1
+META -. Vault Metadata .-> B2
+META -. Vault Metadata .-> B3
 
-META -. Metadata Mapping .-> D1
-META -. Metadata Mapping .-> D2
-META -. Metadata Mapping .-> D3
-META -. Metadata Mapping .-> D4
+IMETA -. Image Metadata .-> B1
+IMETA -. Image Metadata .-> B2
+IMETA -. Image Metadata .-> B3
 
 %% ==========================================================
 %% INTEGRITY VERIFICATION
 %% ==========================================================
 
-VM["Verify Metadata"]
-VC["Verify Container"]
-VE["Verify Blob Existence"]
-VS["Verify Blob Size"]
-VH["Verify SHA256 Hash"]
+VERIFY["Integrity Verification"]
 
-META --> VM
+META --> VERIFY
+IMETA --> VERIFY
 
-D1 --> VC
-D2 --> VC
-D3 --> VC
-D4 --> VC
-
-VM --> VC
-VC --> VE
-VE --> VS
-VS --> VH
+VERIFY --> VC["Verify Containers"]
+VC --> VE["Verify Blob Existence"]
+VE --> VS["Verify Blob Size"]
+VS --> VH["Verify SHA-256"]
 
 %% ==========================================================
 %% RECONSTRUCTION
 %% ==========================================================
 
-BR["Blob Reconstruction"]
-RAM2["Encrypted Bytes (RAM)"]
-DEC["AES-GCM Decryption"]
-EDITOR["Vault Editor"]
+VH --> MERGE["Blob Reconstruction"]
 
-VH --> BR
-BR --> RAM2
-RAM2 --> DEC
-DEC --> EDITOR
+MERGE --> RAM2["Encrypted Bytes (RAM)"]
+
+RAM2 --> DEC["AES-GCM Decryption"]
+
+K --> DEC
 
 %% ==========================================================
-%% UI LAYER
+%% APPLICATION LAYER
+%% ==========================================================
+
+DEC --> APP
+
+APP["Application Layer"]
+
+APP --> EDITOR["Vault Editor"]
+APP --> GALLERY["Image Gallery"]
+
+%% ==========================================================
+%% IMAGE CACHE
+%% ==========================================================
+
+GALLERY --> CACHE["Thumbnail Cache"]
+
+CACHE --> PREVIEW["Image Preview"]
+
+%% ==========================================================
+%% USER INTERFACE
 %% ==========================================================
 
 EDITOR --> THEME
+PREVIEW --> THEME
+
 THEME["Theme Engine"]
+
 THEME --> UI["PassCore UI"]
 
 %% ==========================================================
@@ -88,8 +116,12 @@ THEME --> UI["PassCore UI"]
 
 BACKUP["Backup System"]
 
-BR --> BACKUP
+META --> BACKUP
+IMETA --> BACKUP
+CTN --> BACKUP
+
 BACKUP --> ZIP["ZIP Archive"]
+
 ZIP --> RETENTION["Backup Retention"]
 ```
 
@@ -117,7 +149,7 @@ The derived key is used with AES-GCM authenticated encryption.
 
 ---
 
-# Distributed Blob Storage
+# Blob Storage Architecture
 
 PassCore stores encrypted vault data inside distributed container directories.
 
@@ -224,13 +256,88 @@ No temporary vault files are created during normal operation.
 
 ---
 
+# Image Vault Architecture
+
+Imported images follow the same secure storage pipeline as the vault.
+
+```text
+    Image File
+        ↓
+   Read Bytes
+        ↓
+ AES-GCM Encryption
+        ↓
+Encrypted Image Bytes
+        ↓
+  Blob Splitting
+        ↓
+Random Container Allocation
+        ↓
+  metadata.json
+        ↓
+ images_index.json
+```
+
+When an image is opened:
+
+```text
+  images_index.json
+        ↓
+   Locate Image
+        ↓
+Integrity Verification
+        ↓
+ Blob Reconstruction
+        ↓
+Encrypted Image Bytes (RAM)
+        ↓
+ AES-GCM Decryption
+        ↓
+   Image Preview
+```
+
+Image data is reconstructed entirely in memory. No temporary decrypted image files are written to disk.
+
+---
+
+# Thumbnail Cache
+
+To improve gallery performance, PassCore caches recently reconstructed image previews in memory.
+
+```text
+ Open Image
+      ↓
+ Cache Lookup
+      ↓
+Cache Hit ─────► Display Thumbnail
+      │
+      ▼
+ Cache Miss
+      ↓
+Blob Reconstruction
+      ↓
+AES-GCM Decryption
+      ↓
+Generate Thumbnail
+      ↓
+Store in Cache
+      ↓
+Display Thumbnail
+```
+
+The cache avoids repeated blob reconstruction and decryption while browsing albums.
+
+---
+
 # Backup Architecture
 
 Backups contain:
 
 * vault.salt
 * meta.json
-* encrypted containers
+* images_index.json
+* settings.json
+* encrypted blob containers
 
 Workflow:
 

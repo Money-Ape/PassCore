@@ -8,37 +8,76 @@
   Offline-First • Distributed Blob Storage • Integrity Verification • Secure Vault Management
 </p>
 
-PassCore is a desktop password manager written in Python that focuses on local-first storage, authenticated encryption, vault integrity verification, and master-password-based access control.
+PassCore is an offline-first desktop password manager designed to keep your data private and under your control.
 
-> **Project Status:** Alpha Release (v0.4.2)
+Unlike cloud-based password managers, PassCore stores everything locally on your device. Your vault never leaves your computer, and no online account is required.
+
+Built with Python and PySide6, PassCore combines modern encryption, distributed blob storage, automatic integrity verification, encrypted image storage, backups, and a clean desktop interface into a single secure application.
+
+> **Project Status:** Alpha (v0.4.3)
+
+---
+
+## Why PassCore?
+
+Most password managers rely on cloud synchronization and online accounts.
+
+PassCore follows a different philosophy:
+
+- Everything stays on your device.
+- No cloud storage.
+- No user accounts.
+- No tracking.
+- No subscriptions.
+- No internet connection required.
+
+Your data belongs to you.
 
 ---
 
 ## Features
+### Security
+- AES-GCM authenticated encryption
+- Argon2id key derivation
+- Master password authentication
+- Automatic vault locking
+- Memory-only vault reconstruction
+- SHA-256 integrity verification
+- Blob corruption detection
+- Automatic vault backups & recovery
 
-* AES-GCM encryption with Argon2id key derivation
-* Master-password protected vault with custom authentication dialog
-* Password confirmation, validation, and visibility toggle support
-* Binary vault storage with distributed blob container architecture
-* Metadata-driven reconstruction and SHA256 integrity verification
-* Vault corruption detection and recovery validation
-* Automatic backups, recovery workflows, and backup retention
-* Vault locking, unlocking, autosave, inactivity-based auto-lock, and save-before-exit protection
-* Vault size tracking and created/modified timestamps
-* Cross-platform storage layouts (Linux & Windows)
-* Built-in cryptographically secure password generator
-* Memory-only vault reconstruction and editing workflow
-* Integrated vault health diagnostics and integrity reporting
-* Integrated record search with match navigation and Ctrl+F support
-* Import TXT records and import/export PassCore Vaults (.pcv)
-* Vault size tracking, timestamps, and cross-platform storage layouts
-* Runtime theme engine with live theme switching
-* 13 built-in themes
-* Theme persistence via settings system
-* Placeholder-style welcome screen for empty vaults
-* Debian package support (.deb)
-* Arch Linux package support (PKGBUILD)
-* PySide6 desktop interface with integrated backup and management tools
+### Password Vault
+- Secure password storage
+- Integrated password generator
+- Record search (Ctrl+F)
+- Match navigation
+- Autosave
+- Save-before-close protection
+- Vault statistics
+- Created & modified timestamps
+
+### Image Vault
+- Import images into encrypted storage
+- Album management
+- Responsive gallery layout
+- Google Photos–style timeline
+- Thumbnail caching
+- Image preview
+- Image rename
+- Image deletion
+- Multi-image selection
+- Context menu support
+- Vault image integrity verification
+- Encrypted blob storage
+
+### User Interface
+- Runtime theme switching
+- 13 built-in themes
+- Light & dark themes
+- Welcome screen
+- Custom password dialogs
+- Cross-platform desktop application
+
 ---
 
 ```mermaid
@@ -51,6 +90,7 @@ DistributedContainers --> IntegrityVerification
 IntegrityVerification --> MemoryReconstruction
 MemoryReconstruction --> VaultEditor
 ```
+
 ---
 ![PassCore UI](assets/PassCoreUI_test01.png)
 
@@ -79,6 +119,7 @@ AES-GCM Decryption
 ```
 
 PassCore reconstructs encrypted vault data directly in memory during unlock operations and does not create temporary vault files on disk.
+
 ---
 
 ## Password Authentication Workflow
@@ -143,6 +184,26 @@ Tools
 ```
 ---
 
+## Image Vault
+PassCore includes an encrypted image vault designed for storing personal images alongside your passwords.
+
+Features include:
+
+- Album management
+- Import multiple images
+- Google Photos–style gallery
+- Timeline grouping
+- Responsive layout
+- Thumbnail cache
+- Multi-image selection
+- Rename & delete support
+- Blob integrity verification
+- AES-GCM encrypted storage
+
+Images are stored as encrypted blobs and reconstructed entirely in memory when viewed.
+
+---
+
 ## Search Records
 
 PassCore includes an integrated vault search system for quickly locating records inside the editor.
@@ -151,7 +212,9 @@ The search system supports:
 
 * Ctrl+F search shortcut
 * Sidebar-integrated search interface
-* Case-insensitive searching
+* Theme-aware search highlighting
+* Live match counter
+* Previous / Next navigation
 * Match highlighting
 * Previous/Next match navigation
 * Match counter display
@@ -162,6 +225,7 @@ Access:
 Edit
 └── Search
 ```
+
 ---
 
 ## Theme System
@@ -209,6 +273,7 @@ Check Backups
       ↓
 Generate Health Report
 ```
+
 ---
 
 # Security Design
@@ -259,6 +324,7 @@ PassCore uses platform-appropriate storage locations.
 ```
 
 PassCore reconstructs encrypted vault data directly in memory during unlock operations. No temporary vault files are written to disk during normal editing, encryption, or decryption workflows.
+
 ---
 
 ## Distributed Blob Storage
@@ -309,6 +375,27 @@ This architecture separates:
 ```
 
 and provides a foundation for future distributed storage strategies.
+
+---
+
+## Image Storage
+Images are encrypted before being written to disk.
+
+Each imported image is:
+```text
+     Image
+       ↓
+AES-GCM Encryption
+       ↓
+   Blob Split
+       ↓
+Random Containers
+       ↓
+Metadata Generation
+       ↓
+Integrity Verification
+```
+Images are reconstructed only when opened inside the gallery.
 
 ---
 
@@ -460,6 +547,20 @@ Backup retention automatically removes older backups after the configured limit 
 * Blob size verification
 * SHA256 blob integrity verification
 
+### Image Vault
+
+* Image import
+* Album management
+* Google Photos–style timeline
+* Responsive gallery
+* Image cache
+* Multi-image selection
+* Context menu
+* Rename images
+* Delete images
+* Blob reconstruction
+* Image integrity verification
+
 ### User Interface
 
 * PySide6 desktop application
@@ -477,52 +578,14 @@ Backup retention automatically removes older backups after the configured limit 
 ---
 
 ## Planned Features
-
-### Storage
-
-* Vault export/import
-
-### Security
-
-* Secure overwrite before file deletion
-* Vault health report export
-* Scheduled integrity scans
-
-### User Experience
-
-* Cross-platform packaging
-
----
-
-## Roadmap
-
-* [x] AES-GCM encryption
-* [x] Argon2id key derivation
-* [x] Master password support
-* [x] Binary vault format
-* [x] Vault lock/unlock workflow
-* [x] First-run initialization
-* [x] Blob storage architecture
-* [x] Distributed blob storage
-* [x] Blob reconstruction
-* [x] Save-before-exit protection
-* [x] Autosave workflow
-* [x] XDG storage layout
-* [x] Windows storage layout
-* [x] Blob integrity verification
-* [x] Backup and recovery
-* [x] Created/modified timestamps
-* [x] PySide6 desktop interface
-* [x] Custom password dialog
-* [x] Password visibility toggle
-* [x] Password confirmation workflow
-* [x] Password generator
-* [x] Auto-lock timer
-* [x] Memory-only vault processing
-* [x] Vault health diagnostics
-* [x] Record search and navigation
-* [x] Debian Package Support
-* [x] Arch Linux Package Support
+- Video Vault
+- Document Vault
+- Drag & Drop image import
+- Clipboard image paste
+- Image export
+- Vault compression improvements
+- Secure deletion improvements
+- Full vault diagnostics
 
 ---
 
@@ -544,14 +607,16 @@ Backup retention automatically removes older backups after the configured limit 
 * PySide6
 
 ---
-## Documentation
+
+## Developer Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Storage architecture, blob distribution, integrity verification, recovery workflows, and platform layouts.
 - [PASSWORDGEN.md](PASSWORDGEN.md) — Password Generator architecture, configuration options, generation workflow, and security design.
 - [MENUSYSTEM.md](MENUSYSTEM.md) — Menu hierarchy, vault operations, diagnostics dashboard, search system, import/export workflows, settings, and user interface features.
+
 ---
 
-## Installation
+## Installation (for testing via repo)
 
 ## Packages
 ### Debian

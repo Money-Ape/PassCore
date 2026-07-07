@@ -18,7 +18,8 @@ import importlib, subprocess, sys
 modules = {
     "cryptography" : "cryptography",
     "argon2" : "argon2-cffi",
-    "PySide6" : "PySide6"
+    "PySide6" : "PySide6",
+    "PIL" : "pillow"
 }
 
 missing = []
@@ -36,4 +37,4 @@ if missing:
 EOF
 
 echo "Initializing..."
-python3 enc*.py
+python3 enc.py

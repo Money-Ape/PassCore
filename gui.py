@@ -947,7 +947,8 @@ class PassCoreUI(QMainWindow):
         
         album_name = current.text()
         files, _ = QFileDialog.getOpenFileNames(
-            self, "Import Images", str(Path.home() / "Pictures"), "Images (*.png *.jpg *.jpeg *.bmp *.webp *.gif)"
+            self, "Import Images", str(Path.home() / "Pictures"), "Images (*.png *.jpg *.jpeg *.bmp *.webp *.gif)",
+            options=QFileDialog.Option.DontUseNativeDialog
         )
         if not files:
             return
