@@ -889,11 +889,7 @@ class PassCoreUI(QMainWindow):
         self.gallery_scroll.hide()
         self.preview_widget.hide()
 
-        self.note_list.clear()
-        for note in self.notes:
-            self.note_list.addItem(note["title"])
-        
-        self.note_list.setCurrentRow(0)
+        self.load_notes(self.notes)
 
     # Return from image to preview gallery
     def back_to_gallery(self):
@@ -904,8 +900,8 @@ class PassCoreUI(QMainWindow):
 
     # Images
     def show_images(self):
-        self.reset_image_view()
         self.current_section = "images"
+        self.reset_image_view()
         self.add_btn.setText("+ Image")
         self.note_title.hide()
         self.editor.hide()
@@ -1289,6 +1285,12 @@ class PassCoreUI(QMainWindow):
         with open(IMAGES_META, "w") as del_img:
             json.dump(selc_image, del_img, indent=4)
 
+        current = self.note_list.currentItem()
+        if current:
+            self.load_album(current)
+        
+        self.update_album_size(album_name)
+
     def clear_gallery(self):
         while self.gallery_layout.count():
             item = self.gallery_layout.takeAt(0)
@@ -1319,8 +1321,6 @@ class PassCoreUI(QMainWindow):
         self.preview_size.clear()
         self.preview_resolution.clear()
         self.preview_created.clear()
-
-        self.note_list.clearSelection() # Remove selected album
 
     def show_documents(self):
         pass

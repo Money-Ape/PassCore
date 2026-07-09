@@ -259,21 +259,28 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
     if reply == QMessageBox.Yes:
         window.note_list.clear()
         window.note_title.clear()
-        window.notes = [{
-            "title": "Locked",
-            "content": ""
-        }]
+        
         window.current_note = 0
         editor.clear()
-        editor.setPlainText(window.lock_screen)
+        if window.current_section == "credentials":
+            editor.show()
+            editor.setPlainText(window.lock_screen)
+        else:
+            editor.hide()
+            window.gallery_scroll.hide()
+            window.preview_widget.hide()
+            
         editor.setReadOnly(True)
         window.status_label.setText("Locked")
         window.add_btn.setEnabled(False)
         window.note_title.setEnabled(False)
-        window.slide_menu.hide()
+        window.slide_menu.setEnabled(False)
 
         preview_cache.clear()
         merge_cache.clear()
+        window.reset_image_view()
+        window.gallery_scroll.hide()
+        window.preview_widget.hide()
 
         lock_btn.setEnabled(False)
         lock_btn.hide()
@@ -360,10 +367,15 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             unlock_btn.hide()
             window.add_btn.setEnabled(True)
             window.note_title.setEnabled(True)
-            window.slide_menu.show()
+            window.slide_menu.setEnabled(True)
 
             editor.clear()
             editor.setReadOnly(False)
+            if window.current_section == "credentials":
+                window.show_credentials()
+            else:
+                window.show_images()
+
             window.status_label.setText("Unlocked")
             save_btn.setEnabled(True)
             lock_btn.setEnabled(True)
@@ -416,11 +428,18 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 unlock_btn.hide()
                 editor.clear()
                 editor.setReadOnly(False)
+                if window.current_section == "credentials":
+                    window.show_credentials()
+                else:
+                    window.show_images()
+
                 window.notes = [{
                     "title": "Untitled Note",
                     "content": ""
                 }]
-                window.load_notes(window.notes)
+                if window.current_section == "credentials":
+                    window.load_notes(window.notes)
+
                 lock_btn.setEnabled(True)
                 save_btn.setEnabled(True)
                 close_btn.setEnabled(True)
@@ -428,7 +447,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 window.status_label.setText("Unlocked")
                 window.add_btn.setEnabled(True)
                 window.note_title.setEnabled(True)
-                window.slide_menu.show()
+                window.slide_menu.setEnabled(True)
 
                 minutes = window.settings["auto_lock_min"]
                 window.autolock_timer.start(
@@ -485,13 +504,20 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             save_btn.show()
             close_btn.show()
             lock_btn.show()
-            window.load_notes(vault_notes)
             editor.setReadOnly(False)
+            window.notes = vault_notes
+            window.current_note = 0
+            if window.current_section == "credentials":
+                window.show_credentials()
+                window.load_notes(window.notes)
+            else:
+                window.show_images()
+
             window.status_label.setText("Unlocked")
 
             save_btn.setEnabled(True)
             lock_btn.setEnabled(True)
-            window.slide_menu.show()
+            window.slide_menu.setEnabled(True)
 
             minutes = window.settings["auto_lock_min"]
             window.autolock_timer.start(minutes * 60 * 1000)
@@ -521,13 +547,17 @@ def autosave_vault(window, editor):
 def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     window.note_list.clear()
     window.note_title.clear()
-    window.notes = [{
-            "title": "Locked",
-            "content": ""
-        }]
+
     window.current_note = 0
     editor.clear()
-    editor.setPlainText(window.lock_screen)
+    if window.current_section == "credentials":
+        editor.show()
+        editor.setPlainText(window.lock_screen)
+    else:
+        editor.hide()
+        window.gallery_scroll.hide()
+        window.preview_widget.hide()
+
     editor.setReadOnly(True)
     window.status_label.setText("Locked")
     window.add_btn.setEnabled(False)
