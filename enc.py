@@ -1,6 +1,6 @@
 from gui import PassCoreUI, PasswordDialog, QIcon
 from backup import create_backup, secure_del_tree
-import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes
+import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes, backup
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -252,7 +252,7 @@ def decrypt_vault(key, encrypted_blobs):
     except FileNotFoundError as e1:
         return InvalidTag("Unable to decrypt the vault.!\n", e1)
 
-def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):    
+def vault_lock(window, editor, save_btn, unlock_btn, lock_btn, close_btn):    
     reply = QMessageBox.question(
         window, "PassCore", "Lock the vault.?", QMessageBox.Yes | QMessageBox.No
     )
@@ -267,6 +267,9 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
             editor.setPlainText(window.lock_screen)
         else:
             editor.hide()
+            preview_cache.clear()
+            merge_cache.clear()
+            window.reset_image_view()
             window.gallery_scroll.hide()
             window.preview_widget.hide()
             
@@ -276,16 +279,11 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn):
         window.note_title.setEnabled(False)
         window.slide_menu.setEnabled(False)
 
-        preview_cache.clear()
-        merge_cache.clear()
-        window.reset_image_view()
-        window.gallery_scroll.hide()
-        window.preview_widget.hide()
-
         lock_btn.setEnabled(False)
         lock_btn.hide()
         save_btn.setEnabled(False)
         save_btn.hide()
+        close_btn.setEnabled(True)
         unlock_btn.setEnabled(True)
 
         unlock_btn.show()
@@ -547,7 +545,7 @@ def autosave_vault(window, editor):
 def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     window.note_list.clear()
     window.note_title.clear()
-
+    
     window.current_note = 0
     editor.clear()
     if window.current_section == "credentials":
@@ -555,21 +553,24 @@ def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
         editor.setPlainText(window.lock_screen)
     else:
         editor.hide()
+        preview_cache.clear()
+        merge_cache.clear()
+        window.reset_image_view()
         window.gallery_scroll.hide()
         window.preview_widget.hide()
-
+        
     editor.setReadOnly(True)
     window.status_label.setText("Locked")
     window.add_btn.setEnabled(False)
+    window.note_title.setEnabled(False)
+    window.slide_menu.setEnabled(False)
 
+    lock_btn.setEnabled(False)
     lock_btn.hide()
-    unlock_btn.setEnabled(True)
+    save_btn.setEnabled(False)
     save_btn.hide()
     close_btn.setEnabled(True)
-    window.slide_menu.hide()
-
-    preview_cache.clear()
-    merge_cache.clear()
+    unlock_btn.setEnabled(True)
 
     unlock_btn.show()
     window.key = None
@@ -583,6 +584,7 @@ def save_vault(window, editor, key):
         return
     
     encrypt_vault(window.notes, key)
+    backup.vault_changed = True
     create_backup()
     window.update_vault_size()
     timestamp = datetime.now().strftime("%I:%M:%S %p")

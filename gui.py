@@ -1,4 +1,4 @@
-import sys, os, subprocess, json, ctypes
+import sys, os, subprocess, json, ctypes, backup
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QScrollArea)
@@ -967,6 +967,7 @@ class PassCoreUI(QMainWindow):
         progress.setValue(len(files))
         self.update_album_size(album_name)
         self.load_album(current)
+        backup.vault_changed = True
 
     # Open selected images
     def open_selected_image(self, filename, album_name):
@@ -1269,8 +1270,9 @@ class PassCoreUI(QMainWindow):
             self.load_album(current)
         
         QMessageBox.information(
-        self, "PassCore", "Image renamed successfully."
+            self, "PassCore", "Image renamed successfully."
         )
+        backup.vault_changed = True
 
     def delete_image(self, album_name, filename):
         with open(IMAGES_META, "r") as del_img:
@@ -1290,6 +1292,7 @@ class PassCoreUI(QMainWindow):
             self.load_album(current)
         
         self.update_album_size(album_name)
+        backup.vault_changed = True
 
     def clear_gallery(self):
         while self.gallery_layout.count():
@@ -1577,6 +1580,7 @@ class PassCoreUI(QMainWindow):
         row = max(0, min(row, len(self.notes) - 1))
         self.current_note = row
         self.note_list.setCurrentRow(row)
+        backup.vault_changed = True
 
     def show_vault_health(self):
         dialog = VaultHealthDialog()
@@ -1590,7 +1594,7 @@ class PassCoreUI(QMainWindow):
             self.editor.insertPlainText(password)
 
     def create_backup_now(self):
-        create_backup()
+        create_backup(force=True)
         self.update_vault_size()
 
     def restore_backup_now(self):

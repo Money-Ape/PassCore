@@ -1,4 +1,4 @@
-import zipfile, shutil, tempfile, json, platform, os
+import zipfile, shutil, tempfile, json, platform, os, backup
 from pathlib import Path
 from backup import META_FILE, SALT_FILE, secure_del_tree
 from PySide6.QtWidgets import (QMessageBox, QFileDialog)
@@ -126,6 +126,8 @@ def import_pcv(window):
                         raise RuntimeError(f"Missing container : {container}")
                     else:
                         shutil.copytree(temp_dir / container, CONTAINER_DIR / container)
+
+            backup.vault_changed = True
         return True
         
     except Exception as e:

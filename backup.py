@@ -1,4 +1,4 @@
-import os, zipfile, platform, shutil
+import os, zipfile, platform, shutil, threading
 from datetime import datetime
 from pathlib import Path
 from PySide6.QtWidgets import QFileDialog, QMessageBox
@@ -67,32 +67,60 @@ IMAGES_META = PASSCORE_DIR / "images_index.json"
 BACKUP_ROOT = Path.home() / "Documents" / "PassCore Backups" # PassCore Backups root
 BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
 
-def create_backup():
-    timestamp = datetime.now().strftime("%d%m%Y%H%M%S")
-    zip_dir = BACKUP_ROOT / f"passcore_backup_{timestamp}.zip"
+vault_changed = False
+def _create_backup(force=False):
+    global vault_changed
+    if not force and not vault_changed:
+        return
 
-    print(f"Creating Backup[{GREEN}{zip_dir.name}{RESET}]")
-    with zipfile.ZipFile(zip_dir, "w", compression=zipfile.ZIP_DEFLATED) as backto_zip: # writes splitted blobs into zipfile for backup
-        backto_zip.write(SALT_FILE, arcname=SALT_FILE.name)
-        backto_zip.write(META_FILE, arcname=META_FILE.name)
-        backto_zip.write(SETTINGS, arcname=SETTINGS.name)
-        backto_zip.write(IMAGES_META, arcname=IMAGES_META.name)
+    try:
+        timestamp = datetime.now().strftime("%d%m%Y%H%M%S")
+        zip_dir = BACKUP_ROOT / f"passcore_backup_{timestamp}.zip"
 
-        for file in CONTAINER_DIR.rglob("*"):
-            if file.is_file():
-                backto_zip.write(file, arcname=file.relative_to(CONTAINER_DIR))
+        print(f"_create_backup(force={force}, vault_changed={vault_changed})\nCreating Backup[{GREEN}{zip_dir.name}{RESET}]")
+        with zipfile.ZipFile(zip_dir, "w", compression=zipfile.ZIP_DEFLATED) as backto_zip: # writes splitted blobs into zipfile for backup
+            backto_zip.write(SALT_FILE, arcname=SALT_FILE.name)
+            backto_zip.write(META_FILE, arcname=META_FILE.name)
+            backto_zip.write(SETTINGS, arcname=SETTINGS.name)
+            backto_zip.write(IMAGES_META, arcname=IMAGES_META.name)
 
-    MAX_BACKUPS = 10
-    all_backups = sorted(BACKUP_ROOT.glob("*.zip"))
-    while len(all_backups) > MAX_BACKUPS:
-        old_backup = all_backups.pop(0)
-        old_backup.unlink()
+            for file in CONTAINER_DIR.rglob("*"):
+                if file.is_file():
+                    backto_zip.write(file, arcname=file.relative_to(CONTAINER_DIR))
 
-    print(f"Exists: {YELLOW}{zip_dir.exists()}{RESET}")
-    print(f"\nBackup Created[{GREEN}{zip_dir}{RESET}]")
-    print(f"Size: {YELLOW}{zip_dir.stat().st_size}{RESET} bytes")
+        vault_changed = False # Processing the pending backup.
+
+        MAX_BACKUPS = 10
+        all_backups = sorted(BACKUP_ROOT.glob("*.zip"))
+        while len(all_backups) > MAX_BACKUPS:
+            old_backup = all_backups.pop(0)
+            old_backup.unlink()
+
+        print(f"Exists: {YELLOW}{zip_dir.exists()}{RESET}")
+        print(f"\nBackup Created[{GREEN}{zip_dir}{RESET}]")
+        print(f"Size: {YELLOW}{zip_dir.stat().st_size}{RESET} bytes")
+
+    except Exception as e:
+        print(f"[Backup Error: {e}]")
+        vault_changed = True
+
+backup_thread = None
+def create_backup(force=False):
+    print("initiating backup...")
+    global backup_thread
+    if backup_thread and backup_thread.is_alive():
+        print("Backup already running.!")
+        return
+    
+    backup_thread = threading.Thread(
+        target=_create_backup,
+        kwargs={"force": force},
+        daemon=True,
+        name="PassCore Backup")
+    backup_thread.start()
 
 def restore_backup(window):
+    global vault_changed
     backupzip_dir = Path.home() / "Documents" / "PassCore Backups"
 
     backup_file, _ = QFileDialog.getOpenFileName(
@@ -133,3 +161,4 @@ def restore_backup(window):
     window.close_btn.setEnabled(True)
 
     QMessageBox.information(window, "PassCore Restore", "Backup restored successfully.!\n\nUnlock the restored vault to continue.!")
+    vault_changed = True
