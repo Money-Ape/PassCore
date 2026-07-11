@@ -68,7 +68,7 @@ BACKUP_ROOT = Path.home() / "Documents" / "PassCore Backups" # PassCore Backups 
 BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
 
 vault_changed = False
-def _create_backup(force=False):
+def _create_backup(force=False, finished_callback=None):
     global vault_changed
     if not force and not vault_changed:
         return
@@ -100,12 +100,17 @@ def _create_backup(force=False):
         print(f"\nBackup Created[{GREEN}{zip_dir}{RESET}]")
         print(f"Size: {YELLOW}{zip_dir.stat().st_size}{RESET} bytes")
 
+        if finished_callback:
+            finished_callback(True)
+
     except Exception as e:
         print(f"[Backup Error: {e}]")
         vault_changed = True
+        if finished_callback:
+            finished_callback(False)
 
 backup_thread = None
-def create_backup(force=False):
+def create_backup(force=False, finished_callback=None):
     print("initiating backup...")
     global backup_thread
     if backup_thread and backup_thread.is_alive():
@@ -114,7 +119,10 @@ def create_backup(force=False):
     
     backup_thread = threading.Thread(
         target=_create_backup,
-        kwargs={"force": force},
+        kwargs={
+            "force": force,
+            "finished_callback": finished_callback
+        },
         daemon=True,
         name="PassCore Backup")
     backup_thread.start()

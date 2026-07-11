@@ -1,7 +1,7 @@
 import sys, os, subprocess, json, ctypes, backup
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QScrollArea)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent, QColor, QTextCharFormat
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal
 from backup import create_backup, restore_backup, META_FILE, secure_del_tree
@@ -23,6 +23,8 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class PassCoreUI(QMainWindow):
+    backupFinished = Signal(bool)
+
     def __init__(self, vault_key=None):
         super().__init__()
         self.vault_key = vault_key
@@ -87,6 +89,7 @@ class PassCoreUI(QMainWindow):
             "mhae qrnli xouar mhnew ilaqr uxwmo qreni hlnwr qmrai"
             "wwwwwwwwwwwwwwwww wwwwwwwwwwwwwwwww wwwwww www\n"
         )
+        self.backupFinished.connect(self.on_backup_finished)
         self.update_vault_size()
         self.selected_images = set()
         self.vault_text = None
@@ -407,6 +410,22 @@ class PassCoreUI(QMainWindow):
 
         # Save label
         self.save_label.setStyleSheet(self.info_style)
+
+        # Backup Label
+        self.backup_label.setStyleSheet(self.info_style)
+
+        self.backup_progress.setStyleSheet(f"""
+            QProgressBar {{
+                border: 2px solid {self.b};
+                border-radius: 6px;
+                background: {self.w};
+                text-align: center;
+            }}
+            QProgressBar::chunk {{
+                background-color: #1ABC9C;
+                border-radius: 4px;
+            }}
+        """)
 
         # Search bar
         self.search_input.setStyleSheet(f"""
@@ -798,6 +817,18 @@ class PassCoreUI(QMainWindow):
         )
 
         # ==================================================
+        # Backup Label
+        self.backup_label = QLabel(
+            "Backup:\n--"
+        )
+
+        # ==================================================
+        # Backup Progress 
+        self.backup_progress = QProgressBar()
+        self.backup_progress.setRange(0, 0)
+        self.backup_progress.hide()
+
+        # ==================================================
         # Search Rec
         self.search_input = QLineEdit() # Search Input
         self.match_label = QLabel("0 / 0") # Match text counts
@@ -831,6 +862,8 @@ class PassCoreUI(QMainWindow):
         sidebar_layout.addWidget(self.status_label) # Vault Status label
         sidebar_layout.addWidget(self.size_label) # Size label
         sidebar_layout.addWidget(self.save_label) # Last-save label
+        sidebar_layout.addWidget(self.backup_label) # Backup Label
+        sidebar_layout.addWidget(self.backup_progress) # Backup Progress
 
         search_layout = QHBoxLayout()
         search_layout.addWidget(self.search_input) # Search input to sidebar 
@@ -885,6 +918,7 @@ class PassCoreUI(QMainWindow):
         self.note_title.show()
         self.editor.show()
         self.save_label.show()
+        self.backup_label.show()
 
         self.gallery_scroll.hide()
         self.preview_widget.hide()
@@ -906,6 +940,7 @@ class PassCoreUI(QMainWindow):
         self.note_title.hide()
         self.editor.hide()
         self.save_label.hide()
+        self.backup_label.show()
 
         self.gallery_scroll.show()
         self.preview_widget.hide()
@@ -1596,6 +1631,34 @@ class PassCoreUI(QMainWindow):
     def create_backup_now(self):
         create_backup(force=True)
         self.update_vault_size()
+
+    def on_backup_finished(self, success):
+        self.backup_progress.hide()
+        if success:
+            self.backup_finished()
+        else:
+            QMessageBox.warning(
+                self, "PassCore", "Backup failed."
+            )
+
+    def backup_started(self):
+        self.backup_label.setText(
+            f"Backup: Processing..."
+        )
+        self.backup_progress.show()
+
+    def backup_finished(self):
+        timestamp = datetime.now().strftime("%I:%M:%S %p")
+        self.backup_label.setText(
+            f"Backup: Created\n{timestamp}"
+        )
+        self.backup_progress.hide()
+
+    def backup_failed(self):
+        self.backup_label.setText(
+            f"Backup: Failed.!"
+        )
+        self.backup_progress.hide()
 
     def restore_backup_now(self):
         restore_backup(self)

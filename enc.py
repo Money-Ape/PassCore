@@ -584,8 +584,11 @@ def save_vault(window, editor, key):
         return
     
     encrypt_vault(window.notes, key)
+
+    window.backup_started()
     backup.vault_changed = True
-    create_backup()
+    create_backup(finished_callback=window.backupFinished.emit)
+
     window.update_vault_size()
     timestamp = datetime.now().strftime("%I:%M:%S %p")
     window.save_label.setText(
