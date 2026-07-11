@@ -1,5 +1,5 @@
 #define MyAppName "PassCore"
-#define MyAppVersion "0.4.3"
+#define MyAppVersion "0.4.4"
 #define MyAppPublisher "Lovepreet Singh (Money-Ape)"
 #define MyAppURL "https://github.com/Money-Ape/PassCore.git"
 #define MyAppExeName "PassCore.exe"
@@ -29,7 +29,7 @@ InfoBeforeFile=D:\DEV\PassCore\packaging\windows\release\README.txt
 InfoAfterFile=D:\DEV\PassCore\packaging\windows\release\INIT.txt
 ;PrivilegesRequired=lowest
 OutputDir=D:\DEV\PassCore\packaging\windows\release
-OutputBaseFilename=PassCore-Setup
+OutputBaseFilename=PassCore-Setup_{#MyAppVersion}
 SetupIconFile=D:\DEV\PassCore\assets\PassCore.ico
 SolidCompression=yes
 WizardStyle=modern dynamic polar
