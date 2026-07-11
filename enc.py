@@ -438,9 +438,11 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 if window.current_section == "credentials":
                     window.load_notes(window.notes)
 
+                lock_btn.show()
                 lock_btn.setEnabled(True)
+                save_btn.show()
                 save_btn.setEnabled(True)
-                close_btn.setEnabled(True)
+                close_btn.show()
                 
                 window.status_label.setText("Unlocked")
                 window.add_btn.setEnabled(True)
@@ -678,7 +680,7 @@ def user_edit():
         lambda: vault_close(window, window.key))
     
     lock_btn.clicked.connect(
-        lambda: vault_lock(window, editor, save_btn, unlock_btn, lock_btn)
+        lambda: vault_lock(window, editor, save_btn, unlock_btn, lock_btn, close_btn)
     )
     unlock_btn.clicked.connect(
         lambda: unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn)
