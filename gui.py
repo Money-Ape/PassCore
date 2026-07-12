@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent, QColor, QTextCharFormat
-from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal
+from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal, QThread, QMetaObject, Q_ARG
 from backup import create_backup, restore_backup, META_FILE, secure_del_tree
 from passgen import generate_password
 from health import vault_health
@@ -11,6 +11,7 @@ from file import import_txt, import_pcv, export_pcv
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
 from pcvmenu.images import import_image, load_preview, IMAGES_META, CONTAINER_DIR
+from pcvmenu.imageworker import ImageLoader
 from flowlayout import FlowLayout
 from collections import defaultdict
 
@@ -28,6 +29,13 @@ class PassCoreUI(QMainWindow):
     def __init__(self, vault_key=None):
         super().__init__()
         self.vault_key = vault_key
+
+        self.loaderThread = QThread() # Images thread worker (one-by-one thread except each blobs at once.!)
+        self.loader = ImageLoader(self.vault_key)
+        self.loader.moveToThread(self.loaderThread)
+        self.loader.finished.connect(self.thumbnail_loaded)
+        self.loaderThread.start()
+
 
         print("MEIPASS:", getattr(sys, "_MEIPASS", "NOT SET"))
         print("ICON:", resource_path("assets/PassCore.ico"))
@@ -1069,6 +1077,7 @@ class PassCoreUI(QMainWindow):
         )
         today = datetime.today().date()
 
+        self.thumb_widgets = {}
         for day in days:
             header_date = datetime.strptime(day, "%d %B %Y").date()
             images = sorted(timeline[day], reverse=True)
@@ -1084,20 +1093,37 @@ class PassCoreUI(QMainWindow):
             day_flow = self.create_day_section(text)
 
             for _, filename in images:
-                pix = load_preview(self.vault_key, filename, album_name)
-                if pix is None:
-                    continue
 
                 thumb = ImageLabel(filename, album_name)
                 thumb.clicked.connect(self.open_selected_image)
                 thumb.selectionChanged.connect(self.toggle_image_selection)
                 thumb.contextRequested.connect(self.show_image_menu)
-                thumb.setPixmap(
-                    pix.scaledToHeight(
-                    180, Qt.TransformationMode.SmoothTransformation
-                    )
-                )
+
+                placeholder = QPixmap(resource_path("assets/loading.png"))
+                thumb.setPixmap(placeholder.scaledToHeight(180))
+                self.thumb_widgets[(album_name,filename)] = thumb
+
                 day_flow.addWidget(thumb)
+
+                QMetaObject.invokeMethod(
+                    self.loader,
+                    "load",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, filename),
+                    Q_ARG(str, album_name)
+                )
+
+    def thumbnail_loaded(self, album_name, filename, pix):
+        if pix is None:
+            return
+
+        thumb = self.thumb_widgets.get((album_name, filename))
+        if thumb is None:
+            return
+        
+        thumb.setPixmap(
+            pix.scaledToHeight(180, Qt.TransformationMode.SmoothTransformation)
+        )
 
     def toggle_image_selection(self, filename, album_name):
         key = (album_name, filename)
@@ -1879,6 +1905,12 @@ class PassCoreUI(QMainWindow):
         QMessageBox.information(
             self,"PassCore", f"Auto-Lock Timer set to {minutes} minute(s)."
         )
+
+    def closeEvent(self, event):
+        self.loaderThread.quit()
+        self.loaderThread.wait()
+        super().closeEvent(event)
+
 class TimeLineLabel(QLabel):
     def __init__(self, text):
         super().__init__(text)
@@ -1890,6 +1922,7 @@ class TimeLineLabel(QLabel):
                 padding: 10px 4px;
             }
         """)
+
 class ImageLabel(QLabel):
     clicked = Signal(str, str)
     selectionChanged = Signal(str, str)

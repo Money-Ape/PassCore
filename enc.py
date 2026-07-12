@@ -9,6 +9,7 @@ from PySide6.QtWidgets import(QApplication, QMessageBox)
 from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
 from pcvmenu.images import preview_cache, merge_cache
+from pcvmenu.imageworker import ImageLoader
 
 def resource_path(relative_path):
     try:
@@ -358,6 +359,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
 
             window.key = key
             window.vault_key = key
+            window.loader.vault_key = key
             editor.show()
             save_btn.show()
             close_btn.show()
@@ -423,6 +425,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
 
                 window.key = key
                 window.vault_key = key
+                window.loader.vault_key = key
                 unlock_btn.hide()
                 editor.clear()
                 editor.setReadOnly(False)
@@ -493,6 +496,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         ) 
         window.key = key
         window.vault_key = key
+        window.loader.vault_key = key
         try:
             vault_notes = decrypt_vault(key, encrypted_blobs)
             
