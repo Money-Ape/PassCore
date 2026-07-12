@@ -1,5 +1,5 @@
 #define MyAppName "PassCore"
-#define MyAppVersion "0.4.4"
+#define MyAppVersion "0.4.5"
 #define MyAppPublisher "Lovepreet Singh (Money-Ape)"
 #define MyAppURL "https://github.com/Money-Ape/PassCore.git"
 #define MyAppExeName "PassCore.exe"

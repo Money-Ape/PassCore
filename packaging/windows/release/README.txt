@@ -1,4 +1,4 @@
-PassCore v0.4.4 Alpha
+PassCore v0.4.5 Alpha
 
 Maintainer
 ----------
