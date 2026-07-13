@@ -1052,6 +1052,11 @@ class PassCoreUI(QMainWindow):
 
     # Load images inside albums (thumbnail)
     def load_album(self, item):
+        if self.current_section != "images":
+            return
+        if item is None:
+            return
+
         self.clear_gallery()
         self.selected_images.clear()
         self.update_selection_label()
@@ -1551,6 +1556,8 @@ class PassCoreUI(QMainWindow):
         self.editor.setPlainText(note["content"])
 
     def load_notes(self, notes): # Loads the entire vault for Decryption.
+        self.note_list.blockSignals(True)
+
         self.notes = notes
         self.note_list.clear()
 
@@ -1559,6 +1566,11 @@ class PassCoreUI(QMainWindow):
         
         self.current_note = -1
         self.note_list.setCurrentRow(0)
+
+        self.note_list.blockSignals(False)
+
+        if notes:
+            self.load_note(0)
 
     def save_current_note(self):
         if not self.notes:

@@ -1,15 +1,15 @@
 import zipfile, shutil, tempfile, json, platform, os, backup
 from pathlib import Path
-from backup import META_FILE, SALT_FILE, secure_del_tree
+from backup import META_FILE, SALT_FILE, SETTINGS, IMAGES_META, secure_del_tree
 from PySide6.QtWidgets import (QMessageBox, QFileDialog)
 
 def get_container_dir():
     sys = platform.system()
     if sys == "Linux":
-        return Path.home() / ".local" / "share" / ".passcore_db" / "notes"
+        return Path.home() / ".local" / "share" / ".passcore_db"
     
     elif sys == "Windows":
-        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData" / "notes"
+        return Path(os.getenv("LOCALAPPDATA")) / "PassCoreData"
     else:
         raise RuntimeError(f"Unsupported OS: {sys}")
 
@@ -86,48 +86,14 @@ def import_pcv(window):
         return
     
     try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with zipfile.ZipFile(file_path, "r") as archive:
-                archive.extractall(temp_dir)
-            temp_dir = Path(temp_dir)
-        
-            temp_meta = temp_dir / "meta.json"
-            temp_salt = temp_dir / "vault.salt"
+        with zipfile.ZipFile(file_path, "r") as archive:
+            archive.extractall(CONTAINER_DIR)
 
-            if not temp_meta.exists():
-                raise RuntimeError("meta.json is missing from the vault")
-            
-            if not temp_salt.exists():
-                raise RuntimeError("vault.salt is missing from the vault")
-            
-            if META_FILE.exists():
-                META_FILE.unlink()
+        shutil.move(CONTAINER_DIR / "meta.json", META_FILE)
+        shutil.move(CONTAINER_DIR / "vault.salt", SALT_FILE)
+        shutil.move(CONTAINER_DIR / "settings.json", SETTINGS)
+        shutil.move(CONTAINER_DIR / "images_index.json", IMAGES_META)
 
-            if SALT_FILE.exists():
-                SALT_FILE.unlink()
-            
-            if CONTAINER_DIR.exists():
-                secure_del_tree(CONTAINER_DIR)
-
-            shutil.copy2(temp_meta, META_FILE)
-            shutil.copy2(temp_salt, SALT_FILE)
-
-            with open(temp_meta, "r") as meta:
-                metadata = json.load(meta)
-                containers = {
-                    info["container"]
-                    for info in metadata["blobs"].values()
-                }
-
-                CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
-                for container in containers:
-                    path = Path(temp_dir / container)
-                    if not path.exists():
-                        raise RuntimeError(f"Missing container : {container}")
-                    else:
-                        shutil.copytree(temp_dir / container, CONTAINER_DIR / container)
-
-            backup.vault_changed = True
         return True
         
     except Exception as e:
@@ -156,6 +122,8 @@ def export_pcv(window):
         with zipfile.ZipFile(file_path, "w", compression=zipfile.ZIP_DEFLATED) as export_to_zip: # writes splitted blobs into zipfile for backup
             export_to_zip.write(SALT_FILE, arcname=SALT_FILE.name)
             export_to_zip.write(META_FILE, arcname=META_FILE.name)
+            export_to_zip.write(SETTINGS, arcname=SETTINGS.name)
+            export_to_zip.write(IMAGES_META, arcname=IMAGES_META.name)
 
             for file in CONTAINER_DIR.rglob("*"):
                 if file.is_file():

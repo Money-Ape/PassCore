@@ -149,6 +149,12 @@ def restore_backup(window):
     if SALT_FILE.exists():
         SALT_FILE.unlink()
 
+    if SETTINGS.exists():
+        SETTINGS.unlink()
+
+    if IMAGES_META.exists():
+        IMAGES_META.unlink()
+
     with zipfile.ZipFile(backup_file, "r") as backfrom_zip:
         backfrom_zip.extractall(CONTAINER_DIR) 
         shutil.move(CONTAINER_DIR / "meta.json", PASSCORE_DIR)
