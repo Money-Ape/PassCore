@@ -193,11 +193,11 @@ class PassCoreUI(QMainWindow):
 
                 border: 2px solid {self.b};
 
-                border-top-right-radius: 12px;
-                border-bottom-right-radius: 12px;
+                border-top-left-radius: 12px;
+                border-bottom-left-radius: 12px;
 
-                border-top-left-radius: 0px;
-                border-bottom-left-radius: 0px;
+                border-top-right-radius: 0px;
+                border-bottom-right-radius: 0px;
             }}
         """)
 
@@ -629,7 +629,7 @@ class PassCoreUI(QMainWindow):
         self.menu_btn.setAutoRaise(True)
         self.menu_btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        menu.setCornerWidget(self.menu_btn, Qt.Corner.TopLeftCorner)
+        menu.setCornerWidget(self.menu_btn, Qt.Corner.TopRightCorner)
         self.menu_btn.clicked.connect(self.toggle_slide_menu)
 
         file_menu = menu.addMenu("File") # File Menu
@@ -909,7 +909,7 @@ class PassCoreUI(QMainWindow):
         
         note_geo = self.note_list.geometry()
         self.slide_menu.setGeometry(
-            -self.SLIDE_MENU_WIDTH, # hidden outside the window
+            self.width(), # hidden outside the window
             note_geo.y(), # just below the menubar
             self.SLIDE_MENU_WIDTH, # Drawer width
             note_geo.height()
@@ -1411,8 +1411,14 @@ class PassCoreUI(QMainWindow):
         note_geo = self.note_list.geometry()
         self.update_selection_label()
 
+        x = self.slide_menu.x()
+        if not self.menu_option:
+            x = self.width()
+        else:
+            x = self.width() - self.SLIDE_MENU_WIDTH
+
         self.slide_menu.setGeometry(
-            self.slide_menu.x(),
+            x,
             note_geo.y(), # just below the menubar
             self.SLIDE_MENU_WIDTH, # Drawer width
             note_geo.height()
@@ -1444,13 +1450,16 @@ class PassCoreUI(QMainWindow):
         self.slide_menu.raise_()
         y = self.menuBar().height()
 
+        hidden_x = self.width()
+        shown_x = self.width() - self.SLIDE_MENU_WIDTH
+
         if self.menu_option:
-            self.menu_animation.setStartValue(QPoint(0, y))
-            self.menu_animation.setEndValue(QPoint(-self.SLIDE_MENU_WIDTH, y))
+            self.menu_animation.setStartValue(QPoint(shown_x, y))
+            self.menu_animation.setEndValue(QPoint(hidden_x, y))
         
         else:
-            self.menu_animation.setStartValue(QPoint(-self.SLIDE_MENU_WIDTH, y))
-            self.menu_animation.setEndValue(QPoint(0, y))
+            self.menu_animation.setStartValue(QPoint(hidden_x, y))
+            self.menu_animation.setEndValue(QPoint(shown_x, y))
         
         self.menu_animation.start()
         self.menu_option = not self.menu_option
