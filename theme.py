@@ -1,5 +1,29 @@
 
 THEMES = {
+    "cozy_pink": {
+        "window": "#2B2026",
+        "workspace": "#37272F",
+        "interactive": "#5A4350",
+        "border": "#8B6B7A",
+        "text": "#FFF5F8",
+        "search": "#FFB86C"
+    },
+    "soft_blossom": {
+        "window": "#F8EEF2",
+        "workspace": "#FDEEF3",
+        "interactive": "#F6DCE5",
+        "border": "#D8AFC0",
+        "text": "#2F2530",
+        "search": "#FF9F43"
+    },
+    "rose_night": {
+        "window": "#1E181D",
+        "workspace": "#2A2127",
+        "interactive": "#4C3944",
+        "border": "#755765",
+        "text": "#FFF4F8",
+        "search": "#FFB86C"
+    },
     "slate_grey": {
         "window": "#1F2937",
         "workspace": "#2D3748",
