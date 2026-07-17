@@ -3,6 +3,7 @@
 *.key
 *.salt
 *.exe
+deb-venv/
 
 packaging/linux/passcore_x86_64/src
 packaging/linux/passcore_x86_64/pkg
