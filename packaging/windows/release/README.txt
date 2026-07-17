@@ -1,4 +1,4 @@
-PassCore v0.4.5 Alpha
+PassCore v0.4.6 Alpha
 
 Maintainer
 ----------
@@ -55,7 +55,7 @@ PassCore never uploads your data or communicates with external servers.
 
 Project Status
 --------------
-Alpha Release (v0.4.3)
+Alpha Release (v0.4.6)
 
 PassCore is under active development. While the application includes modern cryptography and integrity verification, it is still considered experimental.
 
