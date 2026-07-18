@@ -154,8 +154,10 @@ def encrypt_image(image_path, image_info, image_bytes, album_name, vault_key):
 
         albums = old_meta["albums"]
         if album_name not in albums:
+            album_id = uuid.uuid4().hex[:32]
             albums[album_name] = {album_id: {}}
 
+        album_id = next(iter(albums[album_name]))
         default_albums = albums[album_name][album_id]
 
         if image_path.name in default_albums:
@@ -202,7 +204,7 @@ def encrypt_image(image_path, image_info, image_bytes, album_name, vault_key):
                 "width": image_info["width"],
                 "height": image_info["height"],
                 "size" : len(image_info["image_bytes"]),
-                "sha256": enc_sha256,
+                "sha256": hashlib.sha256(encrypted_data).hexdigest(),
                 "created_at": timestamp,
             }
             old_meta["albums"][album_name][album_id][image_path.name] = image_data

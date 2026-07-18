@@ -1349,12 +1349,12 @@ class PassCoreUI(QMainWindow):
         )
         backup.vault_changed = True
 
-    def delete_image(self, album_id, album_name, filename):
+    def delete_image(self, album_name, filename):
         with open(IMAGES_META, "r") as del_img:
             selc_image = json.load(del_img)
-        
+        album_id = next(iter(selc_image["albums"][album_name]))
         ctn_id = selc_image["albums"][album_name][album_id][filename]
-        ctn_path = Path(CONTAINER_DIR / ctn_id["uuid"])
+        ctn_path = Path(CONTAINER_DIR / album_id / ctn_id["uuid"])
         
         secure_del_tree(ctn_path)
         
