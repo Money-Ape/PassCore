@@ -1,4 +1,4 @@
-import sys, os, subprocess, json, ctypes, backup
+import sys, os, subprocess, json, ctypes, backup, uuid
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
@@ -1013,7 +1013,7 @@ class PassCoreUI(QMainWindow):
         backup.vault_changed = True
 
     # Open selected images
-    def open_selected_image(self, filename, album_name):
+    def open_selected_image(self, filename, album_id, album_name):
         pix = load_preview(self.vault_key, filename, album_name)
         self.image_preview.setPixmap(
             pix.scaled(
@@ -1025,7 +1025,7 @@ class PassCoreUI(QMainWindow):
         with open(IMAGES_META, "r") as open_image:
             data = json.load(open_image)
 
-        info = data["albums"][album_name][filename]
+        info = data["albums"][album_name][album_id][filename]
 
         self.preview_name.setText(f"Filename : {filename}")
         self.preview_size.setText(f"Size : {self.size_calc(info["size"])}")
@@ -1067,7 +1067,8 @@ class PassCoreUI(QMainWindow):
         with open(IMAGES_META, "r") as album:
             l_album = json.load(album)
 
-        album = l_album["albums"][album_name]
+        album_id = next(iter(l_album["albums"][album_name]))
+        album = l_album["albums"][album_name][album_id]
         if not album:
             return
 
@@ -1173,10 +1174,15 @@ class PassCoreUI(QMainWindow):
         with open(IMAGES_META, "r") as s:
             size_meta = json.load(s)
 
-        album_size = size_meta["albums"].get(album_name, {})
+        album_size = size_meta["albums"].get(album_name)
+        if album_size is None:
+            self.size_label.setText("Size\n0 Bytes")
+            return
+
+        album_id = next(iter(album_size))
         total_size = sum(
             image["size"]
-            for image in album_size.values()
+            for image in album_size[album_id].values()
         )
         self.size_label.setText(f"Size:\n{self.size_calc(total_size)}")
 
@@ -1220,7 +1226,8 @@ class PassCoreUI(QMainWindow):
             )
             return
 
-        data["albums"][album_name] = {} # Create Empty Album.!
+        album_id = uuid.uuid4().hex[:32]
+        data["albums"][album_name] = {album_id: {}} # Create Empty Album along with album's uuid.!
         with open(IMAGES_META, "w") as a_meta:
             json.dump(data, a_meta, indent=4)
         
@@ -1271,13 +1278,14 @@ class PassCoreUI(QMainWindow):
 
         with open(IMAGES_META,"r") as f:
             data=json.load(f)
+        album_id = next(iter(data["albums"][album]))
         
-        not_empty = data["albums"][album]
+        not_empty = data["albums"][album][album_id]
         if not_empty:
             QMessageBox.information(self, "PassCore Album", "Album has images.\ncannot be delete.!")
             return
 
-        del data["albums"][album]
+        del data["albums"][album][album_id]
         with open(IMAGES_META,"w") as f:
             json.dump(data,f,indent=4)
 
@@ -1300,7 +1308,8 @@ class PassCoreUI(QMainWindow):
         
         with open(IMAGES_META, "r") as name:
             r_name = json.load(name)
-        
+        album_id = next(iter(r_name["albums"][album_name]))
+
         album = r_name["albums"][album_name]
         if new_name!= filename and new_name in album:
             QMessageBox.warning(
@@ -1340,16 +1349,16 @@ class PassCoreUI(QMainWindow):
         )
         backup.vault_changed = True
 
-    def delete_image(self, album_name, filename):
+    def delete_image(self, album_id, album_name, filename):
         with open(IMAGES_META, "r") as del_img:
             selc_image = json.load(del_img)
         
-        ctn_id = selc_image["albums"][album_name][filename]
+        ctn_id = selc_image["albums"][album_name][album_id][filename]
         ctn_path = Path(CONTAINER_DIR / ctn_id["uuid"])
         
         secure_del_tree(ctn_path)
         
-        del selc_image["albums"][album_name][filename]
+        del selc_image["albums"][album_name][album_id][filename]
         with open(IMAGES_META, "w") as del_img:
             json.dump(selc_image, del_img, indent=4)
 

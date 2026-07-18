@@ -92,7 +92,7 @@ def import_image(image_path, album_name, vault_key):
 
         # PASSCORE_DIR images metadata
         image_info = {
-            "object_id": uuid.uuid4().hex[:32],
+            "image_id": uuid.uuid4().hex[:32],
             "image_path": image_path,
             "image_bytes": image_bytes,
             "mime": mime,
@@ -118,19 +118,22 @@ def encrypt_image(image_path, image_info, image_bytes, album_name, vault_key):
     encrypted_data.extend(record_enc_data)
 
     timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
+    album_id = uuid.uuid4().hex[:32]
     # PASSCORE_DIR images metadata
     image_meta = {
         "albums": {
             album_name: {
-                image_path.name: {
-                    "uuid": image_info["object_id"],
-                    "mime": image_info["mime"],
-                    "extension": image_path.suffix,
-                    "width": image_info["width"],
-                    "height": image_info["height"],
-                    "size" : len(image_info["image_bytes"]),
-                    "sha256": hashlib.sha256(encrypted_data).hexdigest(),
-                    "created_at": timestamp,
+                album_id: {
+                    image_path.name: {
+                        "uuid": image_info["image_id"],
+                        "mime": image_info["mime"],
+                        "extension": image_path.suffix,
+                        "width": image_info["width"],
+                        "height": image_info["height"],
+                        "size" : len(image_info["image_bytes"]),
+                        "sha256": hashlib.sha256(encrypted_data).hexdigest(),
+                        "created_at": timestamp,
+                    }
                 }
             }
         }
@@ -139,7 +142,7 @@ def encrypt_image(image_path, image_info, image_bytes, album_name, vault_key):
         with open(IMAGES_META, "w") as f_init:
             json.dump(image_meta, f_init, indent=4)
 
-        split_image_bin(image_info, encrypted_data, chunk_size=1024)
+        split_image_bin(image_info, album_name, encrypted_data, chunk_size=1024)
 
         cache_key = f"{album_name}/{image_path.name}"
         preview_cache.pop(cache_key, None)
@@ -151,30 +154,32 @@ def encrypt_image(image_path, image_info, image_bytes, album_name, vault_key):
 
         albums = old_meta["albums"]
         if album_name not in albums:
-            albums[album_name] = {}
+            albums[album_name] = {album_id: {}}
 
-        default_albums = albums[album_name]
+        default_albums = albums[album_name][album_id]
 
         if image_path.name in default_albums:
             old_entry = default_albums[image_path.name]
-            if old_entry["sha256"] == image_info["sha256"]:
+            enc_sha256 = hashlib.sha256(encrypted_data).hexdigest()
+
+            if old_entry["sha256"] == enc_sha256:
                 QMessageBox.information(None, "PassCore Vault", "Image already exists." )
                 return
 
             else:
                 # Modifies existed IMAGES_META json with new entry.
                 image_data = {
-                    "uuid": image_info["object_id"],
+                    "uuid": image_info["image_id"],
                     "mime": image_info["mime"],
                     "extension": image_path.suffix,
                     "width": image_info["width"],
                     "height": image_info["height"],
                     "size" : len(image_info["image_bytes"]),
-                    "sha256": hashlib.sha256(encrypted_data).hexdigest(),
+                    "sha256": enc_sha256,
                     "created_at": old_entry["created_at"],
                     "modified": timestamp
                 }
-                old_meta["albums"][album_name][image_path.name] = image_data
+                old_meta["albums"][album_name][album_id][image_path.name] = image_data
                 with open(IMAGES_META, "w") as update_meta:
                     json.dump(old_meta, update_meta, indent=4)
 
@@ -182,25 +187,25 @@ def encrypt_image(image_path, image_info, image_bytes, album_name, vault_key):
                 preview_cache.pop(cache_key, None)
                 merge_cache.pop(cache_key, None)
 
-                split_image_bin(image_info, encrypted_data, chunk_size=1024)
+                split_image_bin(image_info, album_name, encrypted_data, chunk_size=1024)
 
                 old_id = old_entry["uuid"]
-                old_ctn = Path(CONTAINER_DIR / old_id)
+                old_ctn = Path(CONTAINER_DIR / album_id / old_id)
                 if old_ctn.exists():
                     secure_del_tree(old_ctn)
         else:
             # Update existed IMAGES_META json with new entries.
             image_data = {
-                "uuid": image_info["object_id"],
+                "uuid": image_info["image_id"],
                 "mime": image_info["mime"],
                 "extension": image_path.suffix,
                 "width": image_info["width"],
                 "height": image_info["height"],
                 "size" : len(image_info["image_bytes"]),
-                "sha256": hashlib.sha256(encrypted_data).hexdigest(),
+                "sha256": enc_sha256,
                 "created_at": timestamp,
             }
-            old_meta["albums"][album_name][image_path.name] = image_data
+            old_meta["albums"][album_name][album_id][image_path.name] = image_data
             with open(IMAGES_META, "w") as update_meta:
                 json.dump(old_meta, update_meta, indent=4)
 
@@ -208,7 +213,7 @@ def encrypt_image(image_path, image_info, image_bytes, album_name, vault_key):
             preview_cache.pop(cache_key, None)
             merge_cache.pop(cache_key, None)
 
-            split_image_bin(image_info, encrypted_data, chunk_size=1024)
+            split_image_bin(image_info, album_name, encrypted_data, chunk_size=1024)
 
 def decrypt_image(vault_key, encrypted_blobs):
     enc_cipher = AESGCM(vault_key)
@@ -237,9 +242,13 @@ def merge_image_bin(filename, album_name):
 
     with open(IMAGES_META, "r") as ijson:
         merge_i = json.load(ijson)
+
+    with open(IMAGES_META, "r") as am_d:
+        data = json.load(am_d)
+    album_id = next(iter(data["albums"][album_name]))
     
-    image_id = merge_i["albums"][album_name][filename]["uuid"]
-    container_meta = CONTAINER_DIR / image_id / "metadata.json"
+    image_ctn = merge_i["albums"][album_name][album_id][filename]["uuid"]
+    container_meta = CONTAINER_DIR / album_id / image_ctn / "metadata.json"
 
     merge_data = bytearray()
     with open(container_meta, "r") as read_meta:
@@ -247,7 +256,7 @@ def merge_image_bin(filename, album_name):
 
     for blob_name, blob_info in merge_meta["blobs"].items():
         container_id = blob_info["container"]
-        blob_path = CONTAINER_DIR / image_id / container_id / blob_name
+        blob_path = CONTAINER_DIR / album_id / image_ctn / container_id / blob_name
 
         if not blob_path.exists():
             raise FileNotFoundError(f"Missing blob: {blob_name}")
@@ -256,8 +265,8 @@ def merge_image_bin(filename, album_name):
             merge_data.extend(f.read())
 
     merge_hash = hashlib.sha256(merge_data).hexdigest()
-    if merge_hash != merge_i["albums"][album_name][filename]["sha256"]:
-        raise FileNotFoundError(f"Merged image: {image_id}; failed integrity verification is corrupted.!")
+    if merge_hash != merge_i["albums"][album_name][album_id][filename]["sha256"]:
+        raise FileNotFoundError(f"Merged image: {image_ctn}; failed integrity verification is corrupted.!")
 
     image_bytes = bytes(merge_data)
     merge_cache[cache_key] = image_bytes
@@ -299,9 +308,10 @@ def blob_integrity_verify(filename, album_name):
 
     with open(IMAGES_META, "r") as r_meta:
         blob_meta = json.load(r_meta)
+    album_id = next(iter(blob_meta["albums"][album_name]))
     
-    blob_id = blob_meta["albums"][album_name][filename]
-    blob_meta_path = Path(CONTAINER_DIR / blob_id["uuid"] / "metadata.json") 
+    blob_id = blob_meta["albums"][album_name][album_id][filename]
+    blob_meta_path = Path(CONTAINER_DIR / album_id / blob_id["uuid"] / "metadata.json") 
     if not blob_meta_path.exists():
         raise FileNotFoundError("Metadata file is missing")
     
@@ -311,7 +321,7 @@ def blob_integrity_verify(filename, album_name):
     expected_blobs = ctn_meta["blobs"] # outputs the blob dict from metadata.
     for blob_name in expected_blobs:
         container_id = expected_blobs[blob_name]["container"]
-        blob_path = Path(CONTAINER_DIR / blob_id["uuid"] / container_id / blob_name) # existing blobs path
+        blob_path = Path(CONTAINER_DIR / album_id / blob_id["uuid"] / container_id / blob_name) # existing blobs path
         if not blob_path.exists():
             raise FileNotFoundError(f"Missing blob.: {blob_name}")
         
@@ -331,13 +341,17 @@ def blob_integrity_verify(filename, album_name):
         raise ValueError("blob count mismatch.!")
 
 
-def split_image_bin(image_info, encrypted_data, chunk_size=1024):
-    object_id = image_info["object_id"]
+def split_image_bin(image_info, album_name, encrypted_data, chunk_size=1024):
+    image_id = image_info["image_id"]
 
     blob_info = {}
     index = 0
+
+    with open(IMAGES_META, "r") as album_ctn:
+        data = json.load(album_ctn)
+    album_id = next(iter(data["albums"][album_name]))
     
-    container_path = CONTAINER_DIR / object_id
+    container_path = CONTAINER_DIR / album_id / image_id
     container_path.mkdir(parents=True, exist_ok=True)
 
     for offset in range(0, len(encrypted_data), chunk_size):
@@ -349,7 +363,7 @@ def split_image_bin(image_info, encrypted_data, chunk_size=1024):
         blob_container_path = container_path / blob_container_id
         blob_container_path.mkdir(parents=True, exist_ok=True)
 
-        path = (blob_container_path / f"{object_id}_{index:04d}.bin").resolve()
+        path = (blob_container_path / f"{image_id}_{index:04d}.bin").resolve()
         blob_sha256 = hashlib.sha256(chunk).hexdigest()
         with open(path, "wb") as image_to_path:
             image_to_path.write(chunk)
@@ -361,20 +375,24 @@ def split_image_bin(image_info, encrypted_data, chunk_size=1024):
         }
         index += 1
 
-    image_metadata(image_info, blob_info, encrypted_data)
+    image_metadata(image_info, album_name, blob_info, encrypted_data)
 
-def image_metadata(image_info, blob_info, encrypted_data):
-    object_id = image_info["object_id"]
+def image_metadata(image_info, album_name, blob_info, encrypted_data):
+    image_id = image_info["image_id"]
     image_path = image_info["image_path"]
     image_bytes = image_info["image_bytes"]
 
     # CONTAINER_DIR images metadata
     image_entry = {}
-    container_meta = CONTAINER_DIR / object_id / "metadata.json"
+    with open(IMAGES_META, "r") as album:
+        data = json.load(album)
+    album_id = next(iter(data["albums"][album_name]))
+
+    container_meta = CONTAINER_DIR / album_id / image_id / "metadata.json"
 
     timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
     image_entry = {
-        "uuid": object_id,
+        "uuid": image_id,
         "created_at": timestamp,
         "filename": image_path.name,
         "stem": image_path.stem,
