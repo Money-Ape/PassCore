@@ -60,7 +60,7 @@ PASSCORE_DIR = get_PassCore_dir()
 CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
 PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
 SALT_FILE = PASSCORE_DIR / "vault.salt"
-META_FILE = PASSCORE_DIR / "meta.json"
+META_FILE = PASSCORE_DIR / "notes_index.json"
 SETTINGS = PASSCORE_DIR / "settings.json"
 IMAGES_META = PASSCORE_DIR / "images_index.json"
 
@@ -157,7 +157,7 @@ def restore_backup(window):
 
     with zipfile.ZipFile(backup_file, "r") as backfrom_zip:
         backfrom_zip.extractall(CONTAINER_DIR) 
-        shutil.move(CONTAINER_DIR / "meta.json", PASSCORE_DIR)
+        shutil.move(CONTAINER_DIR / "notes_index.json", PASSCORE_DIR)
         shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
         shutil.move(CONTAINER_DIR / "settings.json", PASSCORE_DIR)
         shutil.move(CONTAINER_DIR / "images_index.json", PASSCORE_DIR)

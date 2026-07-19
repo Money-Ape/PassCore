@@ -55,7 +55,7 @@ Creates a portable encrypted PassCore vault archive.
 Archive Contents:
 
 * vault.salt
-* meta.json
+* notes_index.json
 * encrypted containers
 
 ---

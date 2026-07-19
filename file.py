@@ -89,7 +89,7 @@ def import_pcv(window):
         with zipfile.ZipFile(file_path, "r") as archive:
             archive.extractall(CONTAINER_DIR)
 
-        shutil.move(CONTAINER_DIR / "meta.json", META_FILE)
+        shutil.move(CONTAINER_DIR / "notes_index.json", META_FILE)
         shutil.move(CONTAINER_DIR / "vault.salt", SALT_FILE)
         shutil.move(CONTAINER_DIR / "settings.json", SETTINGS)
         shutil.move(CONTAINER_DIR / "images_index.json", IMAGES_META)

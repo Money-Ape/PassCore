@@ -1013,7 +1013,12 @@ class PassCoreUI(QMainWindow):
         backup.vault_changed = True
 
     # Open selected images
-    def open_selected_image(self, filename, album_id, album_name):
+    def open_selected_image(self, filename, album_name):
+        with open(IMAGES_META, "r") as open_image:
+            data = json.load(open_image)
+
+        album_id = next(iter(data["albums"][album_name]))
+
         pix = load_preview(self.vault_key, filename, album_name)
         self.image_preview.setPixmap(
             pix.scaled(
@@ -1022,9 +1027,6 @@ class PassCoreUI(QMainWindow):
                 Qt.TransformationMode.SmoothTransformation
             )
         )
-        with open(IMAGES_META, "r") as open_image:
-            data = json.load(open_image)
-
         info = data["albums"][album_name][album_id][filename]
 
         self.preview_name.setText(f"Filename : {filename}")
@@ -1548,15 +1550,30 @@ class PassCoreUI(QMainWindow):
         if self.current_note < 0:
             return
         
-        title = self.note_title.text().strip()
-        if not title:
-            title = "Untitled Note"
+        old_title = self.notes[self.current_note]["title"]
+
+        new_title = self.note_title.text().strip()
+        if not new_title:
+            new_title = "Untitled Note"
         
-        self.notes[self.current_note]["title"] = title
+        self.notes[self.current_note]["title"] = new_title
 
         item = self.note_list.item(self.current_note)
         if item:
-            item.setText(title)
+            item.setText(new_title)
+
+        if META_FILE.exists():
+            with open(META_FILE, "r") as note_j:
+                meta = json.load(note_j)
+
+            if old_title in meta["notes"]:
+                meta["notes"][new_title] = meta["notes"].pop(old_title)
+                note_id = next(iter(meta["notes"][new_title]))
+
+                meta["notes"][new_title][note_id]["modified"] = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
+
+            with open(META_FILE, "w") as note_j:
+                json.dump(meta, note_j, indent=4)
 
     def load_note(self, row): # Switch b/w notes already loaded into mem.
         if self.current_section != "credentials":
@@ -1665,12 +1682,26 @@ class PassCoreUI(QMainWindow):
         if len(self.notes) <= 1:
             return
 
+        title = self.notes[row]["title"]
+
         del self.notes[row]
         self.note_list.takeItem(row)
         
         row = max(0, min(row, len(self.notes) - 1))
         self.current_note = row
         self.note_list.setCurrentRow(row)
+
+        with open(META_FILE, "r") as f:
+            meta = json.load(f)
+
+        note = meta["notes"][title]
+        note_id = next(iter(note))
+
+        secure_del_tree(CONTAINER_DIR / note_id)
+        del meta["notes"][title]
+        with open(META_FILE, "w") as f:
+            json.dump(meta, f, indent=4)
+
         backup.vault_changed = True
 
     def show_vault_health(self):

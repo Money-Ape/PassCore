@@ -43,7 +43,7 @@ CTN --> B2["container_id/blob_0001.bin"]
 CTN --> B3["container_id/blob_0002.bin"]
 CTN --> B4["..."]
 
-META["meta.json"]
+META["notes_index.json"]
 IMETA["images_index.json"]
 
 META -. Vault Metadata .-> B1
@@ -177,7 +177,7 @@ Each blob receives:
 Metadata is recorded inside:
 
 ```text
-meta.json
+notes_index.json
 ```
 
 ---
@@ -195,7 +195,7 @@ Before vault reconstruction, PassCore validates:
 Workflow:
 
 ```text
-meta.json
+notes_index.json
       ↓
 Verify Metadata
       ↓
@@ -334,7 +334,7 @@ The cache avoids repeated blob reconstruction and decryption while browsing albu
 Backups contain:
 
 * vault.salt
-* meta.json
+* notes_index.json
 * images_index.json
 * settings.json
 * encrypted blob containers
@@ -402,7 +402,7 @@ Theme changes are applied immediately without restarting the application.
 ```text
 ~/.local/share/passcore/
 ├── vault.salt
-└── meta.json
+└── notes_index.json
 
 ~/.local/share/.passcore_db/
 ├── container_id/
@@ -414,7 +414,7 @@ Theme changes are applied immediately without restarting the application.
 ```text
 %APPDATA%\PassCore\
 ├── vault.salt
-└── meta.json
+└── notes_index.json
 
 %LOCALAPPDATA%\PassCoreData\
 ├── container_id\

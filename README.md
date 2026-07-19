@@ -99,7 +99,7 @@ MemoryReconstruction --> VaultEditor
 ```text
 Encrypted Containers
         ↓
-meta.json Verification
+notes_index.json Verification
         ↓
  Verify Container
         ↓
@@ -304,7 +304,7 @@ PassCore uses platform-appropriate storage locations.
 ```text
 ~/.local/share/passcore/
 ├── vault.salt
-└── meta.json
+└── notes_index.json
 
 ~/.local/share/.passcore_db/
 ├── container_id/
@@ -316,7 +316,7 @@ PassCore uses platform-appropriate storage locations.
 ```text
 %APPDATA%\PassCore\
 ├── vault.salt
-└── meta.json
+└── notes_index.json
 
 %LOCALAPPDATA%\PassCoreData\
 ├── container_id\
@@ -401,7 +401,7 @@ Images are reconstructed only when opened inside the gallery.
 
 ## Blob Integrity Verification
 
-Before vault reconstruction, PassCore validates stored blobs using metadata recorded in `meta.json`.
+Before vault reconstruction, PassCore validates stored blobs using metadata recorded in `notes_index.json`.
 
 Verification includes:
 
@@ -413,7 +413,7 @@ Verification includes:
 Verification flow:
 
 ```text
-    meta.json
+    notes_index.json
         ↓
  Verify Container
         ↓
@@ -451,7 +451,7 @@ PassCore automatically creates compressed ZIP backups of vault storage data.
 Backups contain:
 
 * vault.salt
-* meta.json
+* notes_index.json
 * All encrypted blob containers
 
 Backups are stored separately from vault storage.

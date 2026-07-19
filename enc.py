@@ -9,7 +9,6 @@ from PySide6.QtWidgets import(QApplication, QMessageBox)
 from PySide6.QtCore import QTimer
 from argon2.low_level import hash_secret_raw, Type
 from pcvmenu.images import preview_cache, merge_cache
-from pcvmenu.imageworker import ImageLoader
 
 def resource_path(relative_path):
     try:
@@ -66,7 +65,7 @@ PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 SALT_FILE = PASSCORE_DIR / "vault.salt"
-META_FILE = PASSCORE_DIR / "meta.json"
+META_FILE = PASSCORE_DIR / "notes_index.json"
 CONFIG_FILE =  PASSCORE_DIR / "config.json"
 
 if not SALT_FILE.exists():
@@ -91,38 +90,46 @@ def blob_integrity_verify():
         raise FileNotFoundError("Metadata file is missing")
         
     with open(META_FILE, "r") as blob_meta:
-        vault_meta = json.load(blob_meta)
+        notes_ctn = json.load(blob_meta)
 
-        expected_blobs = vault_meta["blobs"] # outputs the blob dict from metadata.
-        for blob_name in expected_blobs:
-            container_id = expected_blobs[blob_name]["container"]
-            blob_path = CONTAINER_DIR / container_id / blob_name # existing blobs path
-            if not blob_path.exists():
-                raise FileNotFoundError(f"Missing blob.: {blob_name}")
-            
-            actual_size = blob_path.stat().st_size # outputs file size of blobs (each blob)
-            expected_size = expected_blobs[blob_name]["size"] # Store size of a blob from metadata.
-            if actual_size != expected_size: # Compares the physcially stored blob with metadata blobs sizes.!
-                raise ValueError(f"blob size mismatch.: {blob_name}")
-            
-            expected_hash = expected_blobs[blob_name]["sha256"] # outputs stored hash of existing blob
-            actual_hash = sha256_blob(blob_path) # generate hash for existing blob
-            if actual_hash != expected_hash:
-                raise ValueError(f"Hash mismatch.: {blob_name}")
-            
-        actual_blobs = len(vault_meta["blobs"])
-        
-        if actual_blobs != vault_meta["blob_count"]:
-            raise ValueError("blob count mismatch.!")
+        for title, note in notes_ctn["notes"].items():
+            note_id = next(iter(note))
+            note_dir = CONTAINER_DIR / note_id
 
-def merge_blob_bin():
-    with open(META_FILE, "r") as meta_ctn:
+            with open(note_dir / "metadata.json", "r") as meta:
+                vault_meta = json.load(meta)
+
+            expected_blobs = vault_meta["blobs"] # outputs the blob dict from metadata.
+            for blob_name, blob_info in expected_blobs.items():
+                container_id = blob_info["container"]
+                blob_path = note_dir / container_id / blob_name # existing blobs path
+                if not blob_path.exists():
+                    raise FileNotFoundError(f"Missing blob.: {blob_name}")
+                
+                actual_size = blob_path.stat().st_size # outputs file size of blobs (each blob)
+                expected_size = blob_info["size"] # Store size of a blob from metadata.
+                if actual_size != expected_size: # Compares the physcially stored blob with metadata blobs sizes.!
+                    raise ValueError(f"blob size mismatch.: {blob_name}")
+                
+                expected_hash = blob_info["sha256"] # outputs stored hash of existing blob
+                actual_hash = sha256_blob(blob_path) # generate hash for existing blob
+                if actual_hash != expected_hash:
+                    raise ValueError(f"Hash mismatch.: {blob_name}")
+                
+            actual_blobs = len(expected_blobs)
+            
+            if actual_blobs != vault_meta["blob_count"]:
+                raise ValueError("blob count mismatch.!")
+
+def merge_blob_bin(note_id):
+    note_dir = Path(CONTAINER_DIR / note_id)
+    with open(note_dir / "metadata.json", "r") as meta_ctn:
         meta = json.load(meta_ctn)
     
     merge_data = bytearray()
     for blob_name in sorted(meta["blobs"]):
-        container_id = meta["blobs"][blob_name]["container"] 
-        blob_path = CONTAINER_DIR / container_id / blob_name
+        container_id = meta["blobs"][blob_name]["container"]
+        blob_path = note_dir / container_id / blob_name
         
         if not blob_path.exists():
             raise FileNotFoundError(f"Missing blob {blob_name}")
@@ -132,17 +139,23 @@ def merge_blob_bin():
     
     return bytes(merge_data)
 
-def split_file_bin(encrypted_data, chunk_size=32):
+def split_file_bin(encrypted_data, note_id, title, timestamp, chunk_size=64):
+    note_dir = Path(CONTAINER_DIR / note_id)
+    if note_dir.exists():
+        secure_del_tree(note_dir)
+        print(f"{GREEN}REMOVED_EXISTING - {note_id}{RESET}")
+
     blob_info = {}
+    note_dir.mkdir(parents=True, exist_ok=True)
     index = 0
-    
+
     for offset in range(0, len(encrypted_data), chunk_size):
         chunk = encrypted_data[offset : offset + chunk_size]
         if not chunk:
             break
         
         container_id = uuid.uuid4().hex[:16]
-        container_path = CONTAINER_DIR / container_id
+        container_path = note_dir / container_id
         container_path.mkdir(parents=True, exist_ok=True)
         
         path = (container_path / f"blob_{index:04d}.bin").resolve()
@@ -154,35 +167,23 @@ def split_file_bin(encrypted_data, chunk_size=32):
             "container": container_id
         }
         index += 1
+    
+    notes_metadata(title, note_id, timestamp, blob_info, encrypted_data)
 
     return blob_info
 
-def encrypt_vault(notes, key): # Encrypt raw bytes
-    enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
+def notes_metadata(title, note_id, timestamp, blob_info, encrypted_data):
+    with open(META_FILE, "r") as note_d:
+        note_data = json.load(note_d)
 
-    encrypted_data = bytearray()
+    created = note_data["notes"][title][note_id]["created"]
 
-    payload = json.dumps(notes, ensure_ascii=False).encode()
-
-    nonce = os.urandom(12)
-    encrypt_enc_d = enc_cipher.encrypt(nonce, payload, None) # Encrypt string to bytes
-    record_enc_d = nonce + encrypt_enc_d
-    length = len(record_enc_d)
-
-    encrypted_data.extend(struct.pack(">I", length)) # store encrypted raw bytes length
-    encrypted_data.extend(record_enc_d) # store encrypted raw bytes record with nonce
-    print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
-
-    blob_info = split_file_bin(bytes(encrypted_data), chunk_size=32)
-    if not blob_info:
-        raise RuntimeError("No blobs generated.!")
-
-    timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
+    note_dir = Path(CONTAINER_DIR / note_id)
     blob_data = {}
     total_size = 0
     for blob_name, info in blob_info.items():
         container_id = info["container"]
-        blob_path = CONTAINER_DIR / container_id / blob_name
+        blob_path = note_dir / container_id / blob_name
         if Path(blob_name).match("blob_*.bin"):
             size = blob_path.stat().st_size
             blob_data[blob_name] = {
@@ -191,39 +192,70 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
                 "sha256": sha256_blob(blob_path)
             }
             total_size += size
+
+    metadata = {
+        "title": title,
+        "uuid": note_id,
+        "created": created,
+        "modified": timestamp,
+        "encrypted_size": total_size,
+        "blob_count": len(blob_info),
+        "blobs": blob_data
+
+    }
+    with open(note_dir / "metadata.json", "w") as meta:
+        json.dump(metadata, meta, indent=4)
+
+    print("Saved.!")
     print("================================================")
     print(f"Working bin: {len(encrypted_data)} bytes")
     print(f"Total blob size: {total_size} bytes")
     print("================================================")
-    
-    with open(META_FILE, "r") as old_meta:
-        compared = json.load(old_meta)
-        old_ctn = {
-            info["container"]
-            for info in compared["blobs"].values()
-        }
 
-    vault_meta = {
-        "storage_path": str(CONTAINER_DIR),
-        "created": compared["created"],
-        "modified": timestamp,
-        "auth_nonce": compared["auth_nonce"],
-        "auth_blob": compared["auth_blob"],
-        "verifier_hash": compared["verifier_hash"],
-        "total_size": total_size,
-        "blob_count": len(blob_data),
-        "blobs": blob_data
-    }
-    with open(META_FILE, "w") as json_update:
-        json.dump(vault_meta, json_update, indent=4)
-    
-    print("Saved.!\n")
-    
-    for ctn in old_ctn:
-        path  = Path(CONTAINER_DIR / ctn)
-        if path.exists():
-            secure_del_tree(path)
-            print(f"{GREEN}REMOVED_EXISTING - {path.name}{RESET}")
+def encrypt_vault(notes, key): # Encrypt raw bytes
+    enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
+
+    with open(META_FILE, "r") as f:
+        index = json.load(f)
+
+    timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
+    for note in notes:
+        title = note["title"]
+        if title not in index["notes"]:
+            note_id = uuid.uuid4().hex[:32]
+            index["notes"][title] = {
+                note_id: {
+                    "created": timestamp,
+                    "modified": timestamp
+                }
+            }
+            with open(META_FILE, "w") as f:
+                json.dump(index, f, indent=4)
+
+        note_id = next(iter(index["notes"][title]))
+
+        payload = json.dumps(note, ensure_ascii=False).encode()
+
+        encrypted_data = bytearray()
+
+        nonce = os.urandom(12)
+        encrypt_enc_d = enc_cipher.encrypt(nonce, payload, None) # Encrypt string to bytes
+        record_enc_d = nonce + encrypt_enc_d
+        length = len(record_enc_d)
+
+        encrypted_data.extend(struct.pack(">I", length)) # store encrypted raw bytes length
+        encrypted_data.extend(record_enc_d) # store encrypted raw bytes record with nonce
+        print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
+
+        print("\n")
+        blob_info = split_file_bin(bytes(encrypted_data), note_id, title, timestamp, chunk_size=64)
+        if not blob_info:
+            raise RuntimeError("No blobs generated.!")
+
+        index["notes"][title][note_id]["modified"] = timestamp
+
+    with open(META_FILE, "w") as meta_file:
+        json.dump(index, meta_file, indent=4)        
 
 def serialize_notes(notes):
     return json.dumps(notes, ensure_ascii=False)
@@ -233,22 +265,26 @@ def deserialize_notes(data):
 
 def decrypt_vault(key, encrypted_blobs):
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
+    notes = []
     try:
-        offset = 0
-        while offset < len(encrypted_blobs):
-            read_len_data = encrypted_blobs[offset : offset + 4] # Read 4 byte length
-            offset += 4
-            if not read_len_data:
-                break
+        for encrypted_blob in encrypted_blobs:
+            offset = 0
+            while offset < len(encrypted_blob):
+                read_len_data = encrypted_blob[offset : offset + 4] # Read 4 byte length
+                offset += 4
+                if not read_len_data:
+                    break
 
-            length = struct.unpack(">I", read_len_data)[0] # Unpack lenght integer bytes
-            record_enc_d = encrypted_blobs[offset : offset + length] # Read full byte record
-            offset += length
-            nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
-            decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
-            payload = decrypt_enc_d.decode()
-            print(f"{BLUE}DECRYPTED_BLOBS {record_enc_d}{RESET}")
-            return json.loads(payload)
+                length = struct.unpack(">I", read_len_data)[0] # Unpack lenght integer bytes
+                record_enc_d = encrypted_blob[offset : offset + length] # Read full byte record
+                offset += length
+                nonce, cipher_text = record_enc_d[:12], record_enc_d[12:] # Extract nonce and Cipher text
+                decrypt_enc_d = enc_cipher.decrypt(nonce, cipher_text, None) # Decrypt raw bytes to string
+                payload = decrypt_enc_d.decode()
+                print(f"DECRYPTED_BLOBS: {BLUE}{record_enc_d}{RESET}")
+                notes.append(json.loads(payload))
+
+        return notes
                 
     except FileNotFoundError as e1:
         return InvalidTag("Unable to decrypt the vault.!\n", e1)
@@ -297,11 +333,11 @@ def vault_lock(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
 def is_first_run():
     return not META_FILE.exists()
 
-def has_blobs():
-    with open(META_FILE, "r") as meta_ctn:
-        read_meta = json.load(meta_ctn)
+def has_notes():
+    with open(META_FILE, "r") as meta_notes:
+        read_meta = json.load(meta_notes)
 
-    return len(read_meta.get("blobs", {})) > 0
+    return bool(read_meta.get("notes"))
 
 def vault_exists():
     
@@ -317,9 +353,6 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
     while True:
         if is_first_run():            
             vault_meta = {}
-            timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
-            total_size = 0
-            blob_data = {}
 
             dialog = PasswordDialog(title="Create Vault", confirm=True)
             ok = dialog.exec()
@@ -338,21 +371,17 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 hash_len=32, # Output size, in bytes 32bytes = 256bits
                 type=Type.ID # I : Designed against side-channel attacks, D : Designed against GPU attacks for passwords
             )
+            verifier = b"PassCore Vault Verification"
+
             auth_nonce = os.urandom(12)
-            verifier = os.urandom(32)
             auth_blob = AESGCM(key).encrypt(auth_nonce, verifier, None)
             vault_meta = {
                 "storage_path": str(CONTAINER_DIR),
-                "created": timestamp,
-                "modified": timestamp,
                 "auth_nonce": base64.b64encode(auth_nonce).decode(),
                 "auth_blob": base64.b64encode(auth_blob).decode(),
-                "verifier_hash": hashlib.sha256(verifier).hexdigest(),
-                "total_size": total_size,
-                "blob_count": len(blob_data),
-                "blobs": blob_data
+                "verifier_hash": base64.b64encode(verifier).decode(),
+                "notes": {}
                 }
-            print(vault_meta["auth_nonce"],"\n", vault_meta["auth_blob"],"\n", vault_meta["verifier_hash"])
             
             with open(META_FILE, "w") as meta_f:
                 json.dump(vault_meta, meta_f, indent=4)
@@ -394,7 +423,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             )
             return
 
-        if not has_blobs(): # Open Empty editor to prevent integrity checks with no blobs.!
+        if not has_notes(): # Open Empty editor to prevent integrity checks with no blobs.!
             dialog = PasswordDialog(title="Unlock Vault", confirm=False)
             ok = dialog.exec()
             if not ok:
@@ -469,7 +498,15 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 window.vault_corrupted()
                 QMessageBox.information(window, "PassCore", str(e))
                 return
-            encrypted_blobs = merge_blob_bin()
+            
+            encrypted_blobs = []
+            with open(META_FILE, "r") as enc_note:
+                meta = json.load(enc_note)
+            
+            for title, note in meta["notes"].items():
+                note_id = next(iter(note))
+                merged = merge_blob_bin(note_id)
+                encrypted_blobs.append(merged)
 
         except FileNotFoundError:
             QMessageBox.information(
