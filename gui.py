@@ -25,6 +25,7 @@ def resource_path(relative_path):
 
 class PassCoreUI(QMainWindow):
     backupFinished = Signal(bool)
+    restoreFinished = Signal(bool)
 
     def __init__(self, vault_key=None):
         super().__init__()
@@ -98,6 +99,7 @@ class PassCoreUI(QMainWindow):
             "wwwwwwwwwwwwwwwww wwwwwwwwwwwwwwwww wwwwww www\n"
         )
         self.backupFinished.connect(self.on_backup_finished)
+        self.restoreFinished.connect(self.on_restore_finished)
         self.update_vault_size()
         self.selected_images = set()
         self.vault_text = None
@@ -1549,7 +1551,7 @@ class PassCoreUI(QMainWindow):
     def rename_note(self):
         if self.current_note < 0:
             return
-        
+
         new_title = self.note_title.text().strip()
         if not new_title:
             new_title = "Untitled Note"
@@ -1713,6 +1715,23 @@ class PassCoreUI(QMainWindow):
                 self, "PassCore", "Backup failed."
             )
 
+    def on_restore_finished(self, success):
+        if success:
+            self.key = None
+            self.editor.setPlainText(self.lock_screen)
+            self.editor.setReadOnly(True)
+            self.status_label.setText("Locked")
+            self.lock_btn.hide()
+            self.unlock_btn.setEnabled(True)
+            self.unlock_btn.show()
+            self.save_btn.hide()
+            self.close_btn.setEnabled(True)
+            self.restore_finished()
+        else:
+            QMessageBox.critical(
+                self, "PassCore Restore", "Restore Failed.!"
+            )
+
     def backup_started(self):
         self.backup_label.setText(
             f"Backup: Processing..."
@@ -1725,6 +1744,13 @@ class PassCoreUI(QMainWindow):
             f"Backup: Created\n{timestamp}"
         )
         self.backup_progress.hide()
+    
+    def restore_finished(self):
+        timestamp = datetime.now().strftime("%I:%M:%S %p")
+        self.backup_label.setText(
+            f"Backup: Restored\n{timestamp}"
+        )
+        self.backup_progress.hide()
 
     def backup_failed(self):
         self.backup_label.setText(
@@ -1733,7 +1759,7 @@ class PassCoreUI(QMainWindow):
         self.backup_progress.hide()
 
     def restore_backup_now(self):
-        restore_backup(self)
+        restore_backup(self, finished_callback=self.restoreFinished.emit)
         
         self.update_vault_size()
 

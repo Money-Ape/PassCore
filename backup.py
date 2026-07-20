@@ -127,52 +127,72 @@ def create_backup(force=False, finished_callback=None):
         name="PassCore Backup")
     backup_thread.start()
 
-def restore_backup(window):
+def _restore_backup(window, backup_file, finished_callback=None):
     global vault_changed
-    backupzip_dir = Path.home() / "Documents" / "PassCore Backups"
+    
+    try:
+        backup_file = Path(backup_file)
+        if CONTAINER_DIR.exists():
+            secure_del_tree(CONTAINER_DIR)
+        CONTAINER_DIR.mkdir(parents=True, exist_ok=True) # Will create Empty Dir.
+        
+        if META_FILE.exists():
+            META_FILE.unlink()
 
+        if SALT_FILE.exists():
+            SALT_FILE.unlink()
+
+        if SETTINGS.exists():
+            SETTINGS.unlink()
+
+        if IMAGES_META.exists():
+            IMAGES_META.unlink()
+
+
+        with zipfile.ZipFile(backup_file, "r") as backfrom_zip:
+            backfrom_zip.extractall(CONTAINER_DIR) 
+            shutil.move(CONTAINER_DIR / "notes_index.json", PASSCORE_DIR)
+            shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
+            shutil.move(CONTAINER_DIR / "settings.json", PASSCORE_DIR)
+            shutil.move(CONTAINER_DIR / "images_index.json", PASSCORE_DIR)
+
+        print(f"Recovered from {YELLOW}{backup_file.name}{RESET}")
+
+        vault_changed = True
+        if finished_callback:
+            finished_callback(True)
+    
+    except Exception as e:
+        print(f"[Restore Error] {e}")
+
+        if finished_callback:
+            finished_callback(False)
+
+restore_thread = None
+def restore_backup(window, finished_callback=None):
+    global restore_thread
+    backupzip_dir = Path.home() / "Documents" / "PassCore Backups"
     backup_file, _ = QFileDialog.getOpenFileName(
         window, "Select Backup Zip", str(backupzip_dir), "", "Zip archives (*.zip)",
         options=QFileDialog.Option.DontUseNativeDialog
-        )
+    )
     if not backup_file:
         return
-    
-    backup_file = Path(backup_file)
-    if CONTAINER_DIR.exists():
-        secure_del_tree(CONTAINER_DIR)
-    CONTAINER_DIR.mkdir(parents=True, exist_ok=True) # Will create Empty Dir.
-    
-    if META_FILE.exists():
-        META_FILE.unlink()
 
-    if SALT_FILE.exists():
-        SALT_FILE.unlink()
+    window.backup_started()
 
-    if SETTINGS.exists():
-        SETTINGS.unlink()
+    if restore_thread and restore_thread.is_alive():
+        window.backup_finished()
+        QMessageBox.information(window, "PassCore", "Restore Already Running.!")
+        return
 
-    if IMAGES_META.exists():
-        IMAGES_META.unlink()
-
-    with zipfile.ZipFile(backup_file, "r") as backfrom_zip:
-        backfrom_zip.extractall(CONTAINER_DIR) 
-        shutil.move(CONTAINER_DIR / "notes_index.json", PASSCORE_DIR)
-        shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
-        shutil.move(CONTAINER_DIR / "settings.json", PASSCORE_DIR)
-        shutil.move(CONTAINER_DIR / "images_index.json", PASSCORE_DIR)
-
-    print(f"Recovered from {backup_file.name}")
-
-    window.key = None
-    window.editor.setPlainText(window.lock_screen)
-    window.editor.setReadOnly(True)
-    window.status_label.setText("Locked")
-    window.lock_btn.hide()
-    window.unlock_btn.setEnabled(True)
-    window.unlock_btn.show()
-    window.save_btn.hide()
-    window.close_btn.setEnabled(True)
-
-    QMessageBox.information(window, "PassCore Restore", "Backup restored successfully.!\n\nUnlock the restored vault to continue.!")
-    vault_changed = True
+    restore_thread = threading.Thread(
+        target=_restore_backup,
+        kwargs={
+            "window": window,
+            "backup_file": backup_file,
+            "finished_callback": finished_callback
+        },
+        daemon=True, name="PassCore Restore"
+    )
+    restore_thread.start()
