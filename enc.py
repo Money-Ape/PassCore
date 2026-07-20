@@ -140,12 +140,8 @@ def merge_blob_bin(note_id):
     return bytes(merge_data)
 
 def split_file_bin(encrypted_data, note_id, title, timestamp, chunk_size=64):
-    note_dir = Path(CONTAINER_DIR / note_id)
-    if note_dir.exists():
-        secure_del_tree(note_dir)
-        print(f"{GREEN}REMOVED_EXISTING - {note_id}{RESET}")
-
     blob_info = {}
+    note_dir = Path(CONTAINER_DIR / note_id)
     note_dir.mkdir(parents=True, exist_ok=True)
     index = 0
 
@@ -167,8 +163,6 @@ def split_file_bin(encrypted_data, note_id, title, timestamp, chunk_size=64):
             "container": container_id
         }
         index += 1
-    
-    notes_metadata(title, note_id, timestamp, blob_info, encrypted_data)
 
     return blob_info
 
@@ -206,11 +200,11 @@ def notes_metadata(title, note_id, timestamp, blob_info, encrypted_data):
     with open(note_dir / "metadata.json", "w") as meta:
         json.dump(metadata, meta, indent=4)
 
-    print("Saved.!")
     print("================================================")
     print(f"Working bin: {len(encrypted_data)} bytes")
     print(f"Total blob size: {total_size} bytes")
     print("================================================")
+    print(f"Saved.! {YELLOW}{note_id}{RESET}\n")
 
 def encrypt_vault(notes, key): # Encrypt raw bytes
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
@@ -220,7 +214,10 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
 
     timestamp = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
     for note in notes:
-        title = note["title"]
+        print("=" * 60)
+        print("TITLE:", repr(note["title"]))
+        print("INDEX:", list(index["notes"].keys()))
+        title = note["title"].strip()
         if title not in index["notes"]:
             note_id = uuid.uuid4().hex[:32]
             index["notes"][title] = {
@@ -247,15 +244,35 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
         encrypted_data.extend(record_enc_d) # store encrypted raw bytes record with nonce
         print(f"ENCRYPTED: {YELLOW}{length}{RESET}:{GREEN}{record_enc_d}{RESET}")
 
+        note_dir = Path(CONTAINER_DIR / note_id)
+        old_ctns = []
+
+        meta_dir = Path(note_dir / "metadata.json")
+        if meta_dir.exists():
+            with open(meta_dir, "r") as meta:
+                old_meta = json.load(meta)
+            
+            old_ctns = list({
+                info["container"]
+                for info in old_meta["blobs"].values()
+            })
+
         print("\n")
         blob_info = split_file_bin(bytes(encrypted_data), note_id, title, timestamp, chunk_size=64)
-        if not blob_info:
+        if len(blob_info) == 0:
             raise RuntimeError("No blobs generated.!")
 
-        index["notes"][title][note_id]["modified"] = timestamp
+        notes_metadata(title, note_id, timestamp, blob_info, encrypted_data)
 
-    with open(META_FILE, "w") as meta_file:
-        json.dump(index, meta_file, indent=4)        
+        index["notes"][title][note_id]["modified"] = timestamp
+        with open(META_FILE, "w") as meta_file:
+            json.dump(index, meta_file, indent=4)
+
+        for container in old_ctns:
+            path = Path(note_dir / container)
+            if path.exists():
+                secure_del_tree(path)
+                print(f"{GREEN}REMOVED_EXISTING - {container}{RESET}")
 
 def serialize_notes(notes):
     return json.dumps(notes, ensure_ascii=False)
@@ -287,7 +304,7 @@ def decrypt_vault(key, encrypted_blobs):
         return notes
                 
     except FileNotFoundError as e1:
-        return InvalidTag("Unable to decrypt the vault.!\n", e1)
+        raise InvalidTag("Unable to decrypt the vault.!\n", e1)
 
 def vault_lock(window, editor, save_btn, unlock_btn, lock_btn, close_btn):    
     reply = QMessageBox.question(

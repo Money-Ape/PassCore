@@ -1550,8 +1550,6 @@ class PassCoreUI(QMainWindow):
         if self.current_note < 0:
             return
         
-        old_title = self.notes[self.current_note]["title"]
-
         new_title = self.note_title.text().strip()
         if not new_title:
             new_title = "Untitled Note"
@@ -1561,19 +1559,6 @@ class PassCoreUI(QMainWindow):
         item = self.note_list.item(self.current_note)
         if item:
             item.setText(new_title)
-
-        if META_FILE.exists():
-            with open(META_FILE, "r") as note_j:
-                meta = json.load(note_j)
-
-            if old_title in meta["notes"]:
-                meta["notes"][new_title] = meta["notes"].pop(old_title)
-                note_id = next(iter(meta["notes"][new_title]))
-
-                meta["notes"][new_title][note_id]["modified"] = datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
-
-            with open(META_FILE, "w") as note_j:
-                json.dump(meta, note_j, indent=4)
 
     def load_note(self, row): # Switch b/w notes already loaded into mem.
         if self.current_section != "credentials":
