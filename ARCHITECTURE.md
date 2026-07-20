@@ -5,63 +5,72 @@ This Document describes the internal architecture of PassCore, including encrypt
 flowchart TD
 
 %% ==========================================================
-%% AUTHENTICATION & CRYPTOGRAPHY
+%% AUTHENTICATION
 %% ==========================================================
 
 MP["Master Password"]
-A["Argon2id Key Derivation"]
-K["256-bit Vault Key"]
+A["Argon2id"]
+KEY["256-bit Vault Key"]
 
 MP --> A
-A --> K
+A --> KEY
 
 %% ==========================================================
-%% DATA SOURCES
+%% USER DATA
 %% ==========================================================
 
-VAULT["Vault Records"]
-IMAGE["Imported Images"]
+NOTE["Vault Note"]
+IMAGE["Imported Image"]
 
-VAULT --> ENC
+NOTE --> ENC
 IMAGE --> ENC
 
 ENC["AES-GCM Encryption"]
 
-K --> ENC
+KEY --> ENC
 
 ENC --> RAM1["Encrypted Bytes (RAM)"]
 
 %% ==========================================================
-%% STORAGE
+%% NOTE STORAGE
 %% ==========================================================
 
 RAM1 --> SPLIT["Blob Splitting"]
-SPLIT --> CTN["Random Container Allocation"]
 
-CTN --> B1["container_id/blob_0000.bin"]
-CTN --> B2["container_id/blob_0001.bin"]
-CTN --> B3["container_id/blob_0002.bin"]
-CTN --> B4["..."]
+SPLIT --> NOTEUUID["Note UUID"]
 
-META["notes_index.json"]
-IMETA["images_index.json"]
+NOTEUUID --> META["metadata.json"]
 
-META -. Vault Metadata .-> B1
-META -. Vault Metadata .-> B2
-META -. Vault Metadata .-> B3
+META --> C1["Container UUID"]
+META --> C2["Container UUID"]
+META --> C3["Container UUID"]
 
-IMETA -. Image Metadata .-> B1
-IMETA -. Image Metadata .-> B2
-IMETA -. Image Metadata .-> B3
+C1 --> B1["blob_0000.bin"]
+C1 --> B2["blob_0001.bin"]
+
+C2 --> B3["blob_0002.bin"]
+C2 --> B4["blob_0003.bin"]
+
+C3 --> BN["..."]
 
 %% ==========================================================
-%% INTEGRITY VERIFICATION
+%% GLOBAL INDEXES
+%% ==========================================================
+
+INDEX["notes_index.json"]
+IMGINDEX["images_index.json"]
+
+INDEX --> NOTEUUID
+IMGINDEX --> IMAGE
+
+%% ==========================================================
+%% INTEGRITY
 %% ==========================================================
 
 VERIFY["Integrity Verification"]
 
+INDEX --> VERIFY
 META --> VERIFY
-IMETA --> VERIFY
 
 VERIFY --> VC["Verify Containers"]
 VC --> VE["Verify Blob Existence"]
@@ -72,21 +81,21 @@ VS --> VH["Verify SHA-256"]
 %% RECONSTRUCTION
 %% ==========================================================
 
-VH --> MERGE["Blob Reconstruction"]
+VH --> LOAD["Read Containers"]
+
+LOAD --> MERGE["Blob Reconstruction"]
 
 MERGE --> RAM2["Encrypted Bytes (RAM)"]
 
 RAM2 --> DEC["AES-GCM Decryption"]
 
-K --> DEC
+KEY --> DEC
 
 %% ==========================================================
-%% APPLICATION LAYER
+%% APPLICATION
 %% ==========================================================
 
-DEC --> APP
-
-APP["Application Layer"]
+DEC --> APP["Application Layer"]
 
 APP --> EDITOR["Vault Editor"]
 APP --> GALLERY["Image Gallery"]
@@ -103,26 +112,22 @@ CACHE --> PREVIEW["Image Preview"]
 %% USER INTERFACE
 %% ==========================================================
 
-EDITOR --> THEME
+EDITOR --> THEME["Theme Engine"]
 PREVIEW --> THEME
-
-THEME["Theme Engine"]
 
 THEME --> UI["PassCore UI"]
 
 %% ==========================================================
-%% BACKUP SYSTEM
+%% BACKUPS
 %% ==========================================================
 
-BACKUP["Backup System"]
-
-META --> BACKUP
-IMETA --> BACKUP
-CTN --> BACKUP
+INDEX --> BACKUP["Backup System"]
+IMGINDEX --> BACKUP
+NOTEUUID --> BACKUP
 
 BACKUP --> ZIP["ZIP Archive"]
 
-ZIP --> RETENTION["Backup Retention"]
+ZIP --> RETENTION["Retention Policy"]
 ```
 
 ---

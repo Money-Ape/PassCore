@@ -14,7 +14,7 @@ Unlike cloud-based password managers, PassCore stores everything locally on your
 
 Built with Python and PySide6, PassCore combines modern encryption, distributed blob storage, automatic integrity verification, encrypted image storage, backups, and a clean desktop interface into a single secure application.
 
-> **Project Status:** Alpha (v0.4.3)
+> **Project Status:** Alpha (v0.5.0)
 
 ---
 
@@ -297,18 +297,26 @@ PassCore derives vault encryption keys from a master password using Argon2id.
 
 ## Storage Layout
 
-PassCore uses platform-appropriate storage locations.
+PassCore separates vault metadata from encrypted storage.
 
 ### Linux (XDG Compliant)
 
 ```text
 ~/.local/share/passcore/
 ├── vault.salt
-└── notes_index.json
+├── notes_index.json
+├── settings.json
+└── images_index.json
 
 ~/.local/share/.passcore_db/
-├── container_id/
-│   └── blob_*.bin
+├── note_uuid/
+│   ├── metadata.json
+│   ├── container_uuid/
+│   │   ├── blob_0000.bin
+│   │   ├── blob_0001.bin
+│   │   └── ...
+│   └── container_uuid/
+│       └── blob_XXXX.bin
 ```
 
 ### Windows
@@ -316,37 +324,70 @@ PassCore uses platform-appropriate storage locations.
 ```text
 %APPDATA%\PassCore\
 ├── vault.salt
-└── notes_index.json
+├── notes_index.json
+├── settings.json
+└── images_index.json
 
 %LOCALAPPDATA%\PassCoreData\
-├── container_id\
-│   └── blob_*.bin
+├── note_uuid\
+│   ├── metadata.json
+│   ├── container_uuid\
+│   │   ├── blob_0000.bin
+│   │   └── ...
 ```
 
-PassCore reconstructs encrypted vault data directly in memory during unlock operations. No temporary vault files are written to disk during normal editing, encryption, or decryption workflows.
+Each note owns its own storage directory.
+During every save, encrypted blobs are regenerated and metadata is updated while note identity remains tied to its UUID rather than its title.
+
+---
+
+## Note Storage
+
+Every note is identified by a randomly generated UUID.
+
+The displayed title is only a user-facing label and may be renamed at any time without affecting the underlying encrypted storage.
+
+Each note stores:
+
+```text
+metadata.json
+↓
+Container UUIDs
+↓
+Encrypted Blobs
+↓
+SHA-256 Integrity Information
+```
+
+This separation allows PassCore to rename notes without relocating encrypted data on disk.
 
 ---
 
 ## Distributed Blob Storage
 
-PassCore stores encrypted vault chunks inside randomized container directories.
+Each note is assigned a permanent UUID.
 
-Each blob receives a unique container identifier during encryption.
-
-Example:
+Inside each note directory, encrypted vault data is divided into fixed-size encrypted blobs distributed across randomly generated container directories.
 
 ```text
 .passcore_db/
 
-├── a76f1d9a4cd6493d/
-│   └── blob_0000.bin
-
-├── b371b06d00374fb6/
-│   └── blob_0001.bin
-
-├── e2e0f4c1dd31483c/
-│   └── blob_0002.bin
+note_uuid/
+├── metadata.json
+├── 7f61d7ab3f654d91/
+│   ├── blob_0001.bin
+├── c23f0a2b78484d66/
+│   ├── blob_0002.bin
+└── ...
 ```
+
+Every blob records:
+
+- Container identifier
+- Blob size
+- SHA-256 checksum
+
+These values are used during vault reconstruction and integrity verification before decryption.
 
 Container identifiers are recorded inside metadata and used during integrity verification and vault reconstruction.
 
@@ -452,7 +493,10 @@ Backups contain:
 
 * vault.salt
 * notes_index.json
-* All encrypted blob containers
+* settings.json
+* images_index.json
+* All encrypted note directories
+* Image vault storage
 
 Backups are stored separately from vault storage.
 
@@ -518,6 +562,8 @@ Backup retention automatically removes older backups after the configured limit 
 * Password confirmation workflow & visibility toggle
 * Integrated password generator
 * Integrated record search and navigation
+* Background backup creation
+* Background backup restoration
 
 ### Cryptography
 
@@ -529,7 +575,10 @@ Backup retention automatically removes older backups after the configured limit 
 
 * Blob generation
 * Blob reconstruction
+* UUID-based note storage
 * Distributed blob container storage
+* Per-note metadata
+* Per-blob SHA-256 verification
 * Metadata-driven reconstruction
 * In-memory vault reconstruction
 * In-memory vault encryption/decryption workflow
@@ -583,6 +632,9 @@ Backup retention automatically removes older backups after the configured limit 
 - Drag & Drop image import
 - Clipboard image paste
 - Image export
+- Incremental note saving
+- Parallel blob encryption
+- Storage compaction
 - Vault compression improvements
 - Secure deletion improvements
 - Full vault diagnostics
