@@ -312,9 +312,9 @@ PassCore separates vault metadata from encrypted storage.
 ├── note_uuid/
 │   ├── metadata.json
 │   ├── container_uuid/
-│   │   ├── blob_0000.bin
-│   │   ├── blob_0001.bin
-│   │   └── ...
+│   │   └── blob_0000.bin
+│   ├── container_uuid/
+│   │   └── blob_0001.bin
 │   └── container_uuid/
 │       └── blob_XXXX.bin
 ```
@@ -329,11 +329,14 @@ PassCore separates vault metadata from encrypted storage.
 └── images_index.json
 
 %LOCALAPPDATA%\PassCoreData\
-├── note_uuid\
+├── note_uuid/
 │   ├── metadata.json
-│   ├── container_uuid\
-│   │   ├── blob_0000.bin
-│   │   └── ...
+│   ├── container_uuid/
+│   │   └── blob_0000.bin
+│   ├── container_uuid/
+│   │   └── blob_0001.bin
+│   └── container_uuid/
+│       └── blob_XXXX.bin
 ```
 
 Each note owns its own storage directory.
