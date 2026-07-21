@@ -16,13 +16,13 @@ THEMES = {
         "text": "#2F2530",
         "search": "#FF9F43"
     },
-    "rose_night": {
-        "window": "#1E181D",
-        "workspace": "#2A2127",
-        "interactive": "#4C3944",
-        "border": "#755765",
-        "text": "#FFF4F8",
-        "search": "#FFB86C"
+    "catppuccin": {
+        "window": "#1E1E2E",
+        "workspace": "#313244",
+        "interactive": "#45475A",
+        "border": "#6C7086",
+        "text": "#CDD6F4",
+        "search": "#FAB387"
     },
     "slate_grey": {
         "window": "#1F2937",
@@ -32,13 +32,13 @@ THEMES = {
         "text": "#F3F4F6",
         "search": "#FFC107"
     },
-    "pale_green": {
-        "window": "#243128",
-        "workspace": "#2E3F33",
-        "interactive": "#4F6B57",
-        "border": "#6F8F76",
-        "text": "#EEF5EF",
-        "search": "#F57C00"
+    "forest": {
+        "window": "#0E1A17",
+        "workspace": "#162521",
+        "interactive": "#234038",
+        "border": "#3E6B5B",
+        "text": "#EAFBF3",
+        "search": "#F4B860"
     },
     "beige": {
         "window": "#332C25",
@@ -64,21 +64,21 @@ THEMES = {
         "text": "#F0F5EF",
         "search": "#F57C00"
     },
-    "light_blue": {
-        "window": "#243242",
-        "workspace": "#2D3E50",
-        "interactive": "#4B6075",
-        "border": "#6D87A3",
-        "text": "#EEF4FA",
-        "search": "#F57C00"
+    "tokyo_night": {
+        "window": "#1A1B26",
+        "workspace": "#24283B",
+        "interactive": "#414868",
+        "border": "#565F89",
+        "text": "#C0CAF5",
+        "search": "#FF9E64"
     },
-    "blue_gray": {
-        "window": "#1D2530",
-        "workspace": "#252E38",
-        "interactive": "#3A4756",
-        "border": "#556577",
-        "text": "#EAEFF4",
-        "search": "#FFC107"
+    "nord": {
+        "window": "#2E3440",
+        "workspace": "#3B4252",
+        "interactive": "#434C5E",
+        "border": "#4C566A",
+        "text": "#ECEFF4",
+        "search": "#EBCB8B"
     },
     "ivory": {
         "window": "#302D29",
