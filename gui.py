@@ -1407,9 +1407,6 @@ class PassCoreUI(QMainWindow):
     def show_documents(self):
         pass
 
-    def show_audio(self):
-        pass
-
     def show_videos(self):
         pass
 
@@ -1444,7 +1441,6 @@ class PassCoreUI(QMainWindow):
             ("🗝 Credentials", self.show_credentials),
             ("📷 Images", self.show_images),
             ("📄 Documents", self.show_documents),
-            ("🎵 Audio", self.show_audio),
             ("🎬 Videos", self.show_videos),
             ("⭐ Favorites", self.show_favorites),
             ("🗑 Secure Trash", self.show_trash),
