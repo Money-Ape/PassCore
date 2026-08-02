@@ -1,7 +1,7 @@
 # PassCore
 
 <p align="center">
-  <img src="assets/PassCore_logo.jpg" width="350">
+  <img src="assets/PassCore_banner.png" width="350">
 </p>
 
 <p align="center">
