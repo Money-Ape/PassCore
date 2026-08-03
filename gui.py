@@ -1,12 +1,12 @@
 import sys, os, subprocess, json, ctypes, backup, uuid
 from pathlib import Path
 from datetime import datetime
-from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
+from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent, QColor, QTextCharFormat
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal, QThread, QMetaObject, Q_ARG
 from backup import create_backup, restore_backup, META_FILE, secure_del_tree
 from passgen import generate_password
-from health import vault_health
+from health import vault_health, images_health
 from file import import_txt, import_pcv, export_pcv
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
@@ -31,12 +31,7 @@ class PassCoreUI(QMainWindow):
         super().__init__()
         self.vault_key = vault_key
 
-        self.loaderThread = QThread() # Images thread worker (one-by-one thread except each blobs at once.!)
         self.loader = ImageLoader(self.vault_key)
-        self.loader.moveToThread(self.loaderThread)
-        self.loader.finished.connect(self.thumbnail_loaded)
-        self.loaderThread.start()
-
 
         print("MEIPASS:", getattr(sys, "_MEIPASS", "NOT SET"))
         print("ICON:", resource_path("assets/PassCore.ico"))
@@ -108,6 +103,17 @@ class PassCoreUI(QMainWindow):
         self.matches = []
         self.current_match = 0
         self.refresh_theme()
+
+    def start_image_loader(self):
+        if hasattr(self, "loaderThread"):
+            return
+
+        self.loaderThread = QThread() # Images thread worker (one-by-one thread except each blobs at once.!)
+        self.loader.moveToThread(self.loaderThread)
+        self.loader.finished.connect(self.thumbnail_loaded)
+        self.loaderThread.finished.connect(self.loader.deleteLater)
+        self.loaderThread.finished.connect(self.loaderThread.deleteLater)
+        self.loaderThread.start()
 
     def apply_themes(self):
         theme = THEMES[self.settings["theme"]]
@@ -944,6 +950,8 @@ class PassCoreUI(QMainWindow):
 
     # Images
     def show_images(self):
+        self.start_image_loader()
+
         self.current_section = "images"
         self.reset_image_view()
         self.add_btn.setText("+ Image")
@@ -1975,8 +1983,11 @@ class PassCoreUI(QMainWindow):
         )
 
     def closeEvent(self, event):
-        self.loaderThread.quit()
-        self.loaderThread.wait()
+        if hasattr(self, "loaderThread"):
+            if self.loaderThread.isRunning():
+                self.loaderThread.quit()
+                self.loaderThread.wait()
+
         super().closeEvent(event)
 
 class TimeLineLabel(QLabel):
@@ -2164,7 +2175,7 @@ class PasswordDialog(QDialog):
 
         self.show_pass.toggled.connect(self.toggle_password)
         self.unlock_btn.clicked.connect(self.validate_passwd)
-        self.cancel_btn.clicked.connect(self.reject)
+        self.cancel_btn.clicked.connect(self.close)
 
         # pAssCore logo
         logo = QLabel()
@@ -2414,22 +2425,21 @@ class VaultHealthDialog(QDialog):
         self.settings = load_settings()
         self.apply_themes()
         report = vault_health()
+        images_report = images_health()
         self.setWindowTitle("Vault Health")
-        self.setFixedSize(500, 550)
+        self.setFixedSize(500, 650)
 
         score = report["score"]
 
         if score == 100:
             health = "🟢 HEALTHY"
-            color = "#2E7D32"
-
+            health_color = "#2E7D32"
         elif score >= 80:
             health = "🟡 WARNING"
-            color = "#FBC02D"
-
+            health_color = "#FBC02D"
         else:
             health = "🔴 CRITICAL"
-            color = "#E53935"
+            health_color = "#E53935"
 
         self.setStyleSheet(f"""
             QDialog {{
@@ -2463,20 +2473,19 @@ class VaultHealthDialog(QDialog):
             }}
         """)
 
-        # ==========================================
+        # ==================================================
         # Health Status
-        status_label = QLabel(health)
-        status_label.setStyleSheet(f"""
+
+        health_label = QLabel(health)
+        health_label.setStyleSheet(f"""
             QLabel {{
-                color: {color};
+                color: {health_color};
                 font-size: 20pt;
                 font-weight: bold;
             }}
         """)
 
-        score_label = QLabel(
-            f"Score: {score}/100"
-        )
+        score_label = QLabel(f"Score: {score}/100")
         score_label.setStyleSheet(f"""
             QLabel {{
                 font-size: 16pt;
@@ -2485,14 +2494,13 @@ class VaultHealthDialog(QDialog):
             }}
         """)
 
-        # ==========================================
+        # ==================================================
         # Vault Information
+
         info_frame = QFrame()
         info_layout = QVBoxLayout()
 
-        info_title = QLabel(
-            "Vault Information"
-        )
+        info_title = QLabel("Vault Information")
         info_title.setStyleSheet(f"""
             QLabel {{
                 font-size: 13pt;
@@ -2502,14 +2510,18 @@ class VaultHealthDialog(QDialog):
         """)
 
         info_label = QLabel(f"""
-            Created : {report['created']}
-            Modified: {report['modified']}
+            Created  : {report['created']}
+            Modified : {report['modified']}
 
-            Blobs   : {report['blob_count']}
-            Size    : {report['total_size']} bytes
+            Notes Blobs  : {report['blob_count']}
+            Images Blobs : {images_report['blob_count']}
+
+            Note vault Size   : {report['total_size']}
+            Images vault Size : {images_report['total_size']}
+
             Backups : {report['backups']}
-            """
-        )
+        """)
+
         info_label.setStyleSheet(f"""
             QLabel {{
                 font-family: monospace;
@@ -2517,15 +2529,19 @@ class VaultHealthDialog(QDialog):
                 color: {self.t};
             }}
         """)
+
         info_layout.addWidget(info_title)
         info_layout.addWidget(info_label)
-
         info_frame.setLayout(info_layout)
 
-        # ==========================================
+        # ==================================================
         # Integrity Checks
+
         checks_frame = QFrame()
-        checks_layout = QVBoxLayout()
+        checks_layout = QGridLayout()
+
+        checks_layout.setHorizontalSpacing(20)
+        checks_layout.setVerticalSpacing(4)
 
         checks_title = QLabel("Integrity Checks")
         checks_title.setStyleSheet(f"""
@@ -2536,54 +2552,84 @@ class VaultHealthDialog(QDialog):
             }}
         """)
 
-        checks_layout.addWidget(checks_title)
-        checks = [
-            ("Metadata", report["metadata"]),
-            ("Containers", report["containers"]),
-            ("Blobs", report["existence"]),
-            ("Blob Size", report["size"]),
-            ("SHA256", report["sha256"])
-        ]
-        for name, passed in checks:
-            status = (
-                "✓ PASS"
-                if passed
-                else "✗ FAIL"
-            )
-            color = (
-                self.t
-                if passed
-                else "#C62828"
-            )
-            label = QLabel(f"{name:<12} {status}")
-            label.setStyleSheet(f"""
+        checks_layout.addWidget(checks_title, 0, 0, 1, 3)
+
+        headers = ["Check", "Notes", "Images"]
+
+        for c, text in enumerate(headers):
+            lbl = QLabel(text)
+            lbl.setStyleSheet(f"""
                 QLabel {{
-                    color: {color};
+                    color: {self.t};
+                    font-size: 11pt;
+                    font-family: monospace;
+                    font-weight: bold;
+                    text-decoration: underline;
+                }}
+            """)
+            checks_layout.addWidget(lbl, 1, c)
+
+        checks = [
+            ("Metadata", report["metadata"], images_report["metadata"]),
+            ("Containers", report["containers"], images_report["containers"]),
+            ("Blobs", report["existence"], images_report["existence"]),
+            ("Blob Size", report["size"], images_report["size"]),
+            ("SHA256", report["sha256"], images_report["sha256"]),
+        ]
+
+        for row, (name, notes_ok, images_ok) in enumerate(checks, start=2):
+
+            name_label = QLabel(name)
+            name_label.setStyleSheet(f"""
+                QLabel {{
+                    color: {self.t};
                     font-size: 11pt;
                     font-family: monospace;
                 }}
             """)
+            checks_layout.addWidget(name_label, row, 0)
 
-            checks_layout.addWidget(label)
+            for col, passed in ((1, notes_ok), (2, images_ok)):
+
+                text = "✓ PASS" if passed else "✗ FAIL"
+                text_color = self.t if passed else "#C62828"
+
+                check_status_label = QLabel(text)
+                check_status_label.setStyleSheet(f"""
+                    QLabel {{
+                        color: {text_color};
+                        font-size: 11pt;
+                        font-family: monospace;
+                    }}
+                """)
+
+                checks_layout.addWidget(
+                    check_status_label,
+                    row,
+                    col,
+                    alignment=Qt.AlignmentFlag.AlignLeft
+                )
 
         checks_frame.setLayout(checks_layout)
 
-        # ==========================================
+        # ==================================================
         # Close Button
+
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
 
-        # ==========================================
+        # ==================================================
         # Main Layout
+
         layout = QVBoxLayout()
 
-        layout.addWidget(status_label)
+        layout.addWidget(health_label)
         layout.addWidget(score_label)
         layout.addWidget(info_frame)
         layout.addWidget(checks_frame)
-
         layout.addStretch()
         layout.addWidget(close_btn)
+
         self.setLayout(layout)
     
     def apply_themes(self):
