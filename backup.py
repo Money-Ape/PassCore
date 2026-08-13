@@ -2,6 +2,7 @@ import os, zipfile, platform, shutil, threading
 from datetime import datetime
 from pathlib import Path
 from PySide6.QtWidgets import QFileDialog, QMessageBox
+from security.yaml_secure import secure_load
 
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
 YELLOW = "\033[33m" # FRESH Keys, INTEGERS & OLD RECORDS
@@ -148,9 +149,19 @@ def _restore_backup(window, backup_file, finished_callback=None):
         if IMAGES_META.exists():
             IMAGES_META.unlink()
 
-
         with zipfile.ZipFile(backup_file, "r") as backfrom_zip:
-            backfrom_zip.extractall(CONTAINER_DIR) 
+            backfrom_zip.extractall(CONTAINER_DIR)
+            for file in [META_FILE, IMAGES_META, SETTINGS]:
+                path = CONTAINER_DIR/file
+                try:
+                    if path.exists()
+                    with open(path, "r") as validate_f:
+                        contents = validate_f.read()
+                        secure_load(contents) # validate structure
+
+                except Exception as e:
+                    raise RuntimeError(f"Corrupted Backup File: {file} -> {e}")
+
             shutil.move(CONTAINER_DIR / "notes_index.json", PASSCORE_DIR)
             shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
             shutil.move(CONTAINER_DIR / "settings.json", PASSCORE_DIR)
