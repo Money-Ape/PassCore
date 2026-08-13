@@ -2,6 +2,7 @@ import zipfile, shutil, tempfile, json, platform, os, backup
 from pathlib import Path
 from backup import META_FILE, SALT_FILE, SETTINGS, IMAGES_META, secure_del_tree
 from PySide6.QtWidgets import (QMessageBox, QFileDialog)
+from security.yaml_secure import secure_load, convert_yaml_to_text, VaultValidationError
 
 def get_container_dir():
     sys = platform.system()
@@ -36,6 +37,18 @@ def import_txt(window):
         try:
             with open(file_path, "r") as read_imp:
                 imported_txt = read_imp.read()
+
+            try:
+                parsed = secure_load(imported_txt)
+                imported_txt = convert_yaml_to_text(parsed)
+
+            except VaultValidationError as e:
+                QMessageBox.critical(window, "Invalid YAML", str(e))
+                return
+
+            except Exception:
+                # fallback: treat as plain text
+                pass
             
             note_title = Path(file_path).stem
             if reply == QMessageBox.Yes:
