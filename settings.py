@@ -1,5 +1,6 @@
 import json, os, platform
 from pathlib import Path
+from security.yaml_secure import secure_load
 
 def get_PassCore_dir():
     sys = platform.system()
@@ -29,6 +30,14 @@ def load_settings():
     
     try:
         with open(SETTING_FILE, "r", encoding="utf-8") as load_file:
+            content = load_file.read()
+            try:
+                return secure_load(content)
+
+            except Exception:
+                save_settings(DEFAULT_SETTINGS)
+                return DEFAULT_SETTINGS.copy()
+
             return json.load(load_file)
     
     except Exception:

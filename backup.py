@@ -154,10 +154,10 @@ def _restore_backup(window, backup_file, finished_callback=None):
             for file in [META_FILE, IMAGES_META, SETTINGS]:
                 path = CONTAINER_DIR/file
                 try:
-                    if path.exists()
-                    with open(path, "r") as validate_f:
-                        contents = validate_f.read()
-                        secure_load(contents) # validate structure
+                    if path.exists():
+                        with open(path, "r") as validate_f:
+                            contents = validate_f.read()
+                            secure_load(contents) # validate structure
 
                 except Exception as e:
                     raise RuntimeError(f"Corrupted Backup File: {file} -> {e}")
