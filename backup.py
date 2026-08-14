@@ -2,7 +2,7 @@ import os, zipfile, platform, shutil, threading
 from datetime import datetime
 from pathlib import Path
 from PySide6.QtWidgets import QFileDialog, QMessageBox
-from security.yaml_secure import secure_load
+from security.yaml_secure import secure_load, validate_settings
 
 GREEN = "\033[32m" # SUCCESS & NEW RECORDS
 YELLOW = "\033[33m" # FRESH Keys, INTEGERS & OLD RECORDS
@@ -62,7 +62,7 @@ CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
 PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
 SALT_FILE = PASSCORE_DIR / "vault.salt"
 META_FILE = PASSCORE_DIR / "notes_index.json"
-SETTINGS = PASSCORE_DIR / "settings.json"
+SETTINGS = PASSCORE_DIR / "settings.yaml"
 IMAGES_META = PASSCORE_DIR / "images_index.json"
 
 BACKUP_ROOT = Path.home() / "Documents" / "PassCore Backups" # PassCore Backups root
@@ -157,14 +157,15 @@ def _restore_backup(window, backup_file, finished_callback=None):
                     if path.exists():
                         with open(path, "r") as validate_f:
                             contents = validate_f.read()
-                            secure_load(contents) # validate structure
+                            settings = secure_load(contents)
+                            validate_settings(settings) # validate structure
 
                 except Exception as e:
                     raise RuntimeError(f"Corrupted Backup File: {file} -> {e}")
 
             shutil.move(CONTAINER_DIR / "notes_index.json", PASSCORE_DIR)
             shutil.move(CONTAINER_DIR / "vault.salt", PASSCORE_DIR)
-            shutil.move(CONTAINER_DIR / "settings.json", PASSCORE_DIR)
+            shutil.move(CONTAINER_DIR / "settings.yaml", PASSCORE_DIR)
             shutil.move(CONTAINER_DIR / "images_index.json", PASSCORE_DIR)
 
         print(f"Recovered from {YELLOW}{backup_file.name}{RESET}")
