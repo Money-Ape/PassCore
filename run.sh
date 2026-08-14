@@ -19,7 +19,8 @@ modules = {
     "cryptography" : "cryptography",
     "argon2" : "argon2-cffi",
     "PySide6" : "PySide6",
-    "PIL" : "pillow"
+    "PIL" : "pillow",
+    "YAML" : "PyYAML"
 }
 
 missing = []
