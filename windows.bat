@@ -12,7 +12,7 @@ python -c "import cryptography,argon2,PySide6,pillow" 2>NUL
 if errorlevel 1 (
     echo Installing dependencies...
     python -m pip install --upgrade pip
-    python -m pip install cryptography argon2-cffi PySide6 pillow
+    python -m pip install cryptography argon2-cffi PySide6 pillow PyYAML
 )
 
 echo Launching PassCore...
