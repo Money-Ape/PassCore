@@ -2,6 +2,7 @@ import json, hashlib, os, platform
 from pathlib import Path
 from backup import META_FILE, BACKUP_ROOT, IMAGES_META
 from pcvmenu.images import CONTAINER_DIR as IMAGES_CONTAINER_DIR
+from security.yaml_secure import secure_load
 
 def size_calc(size):
     units = ["Bytes", "KB", "MB", "GB", "TB"]
@@ -174,7 +175,8 @@ def _aggregate_stats(meta):
 
 def vault_health():
     with open(META_FILE, "r") as meta_ctn:
-        meta = json.load(meta_ctn)
+        content = meta_ctn.read()
+        meta = secure_load(content)
 
     metadata_ok = verify_metadata()
     containers_ok = verify_containers(meta)
@@ -338,7 +340,8 @@ def images_health():
         }
 
     with open(IMAGES_META, "r") as meta_ctn:
-        meta = json.load(meta_ctn)
+        content = meta_ctn.read()
+        meta = secure_load(content)
 
     metadata_ok = verify_images_metadata()
     containers_ok = verify_image_containers(meta)
