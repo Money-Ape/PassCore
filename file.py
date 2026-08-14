@@ -104,7 +104,7 @@ def import_pcv(window):
 
         shutil.move(CONTAINER_DIR / "notes_index.json", META_FILE)
         shutil.move(CONTAINER_DIR / "vault.salt", SALT_FILE)
-        shutil.move(CONTAINER_DIR / "settings.json", SETTINGS)
+        shutil.move(CONTAINER_DIR / "settings.yaml", SETTINGS)
         shutil.move(CONTAINER_DIR / "images_index.json", IMAGES_META)
 
         return True
