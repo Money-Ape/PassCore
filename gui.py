@@ -7,13 +7,14 @@ from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint,
 from backup import create_backup, restore_backup, META_FILE, secure_del_tree
 from passgen import generate_password
 from health import vault_health, images_health
-from file import import_txt, import_pcv, export_pcv
+from file import import_txt
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
 from pcvmenu.images import import_image, load_preview, IMAGES_META, CONTAINER_DIR
 from pcvmenu.imageworker import ImageLoader
 from flowlayout import FlowLayout
 from collections import defaultdict
+from passcore_util import PassCoreUtility
 
 def resource_path(relative_path):
     try:
@@ -62,6 +63,8 @@ class PassCoreUI(QMainWindow):
         self.current_section = "credentials"
 
         self.build_ui()
+        self.utility = PassCoreUtility()
+
         self.menu_option = False
         self.lock_screen = (
             "mww mww hwm wwl mwwMmwwww wwwmmmwww mwww wwl w wlwwww\n"
@@ -650,7 +653,7 @@ class PassCoreUI(QMainWindow):
         file_menu.addAction(import_vault_action)
 
         export_action = QAction("Export Vault", self) # File menu : Export PassCore Vault
-        export_action.triggered.connect(lambda: export_pcv(self))
+        export_action.triggered.connect(self.export_vault_handler)
         file_menu.addAction(export_action)
 
         settings_menu = file_menu.addMenu("Settings") # File menu : Settings menu
@@ -1707,8 +1710,15 @@ class PassCoreUI(QMainWindow):
             self.editor.insertPlainText(password)
 
     def create_backup_now(self):
-        create_backup(force=True)
-        self.update_vault_size()
+        try:
+            self.backup_started()
+            self.utility.create_backup(force=True)
+            self.backup_finished()
+            self.update_vault_size()
+
+        except Exception as e:
+            self.backup_failed()
+            QMessageBox.warning(self, "PassCore", f"Backup Failed\n\n{e}")
 
     def on_backup_finished(self, success):
         self.backup_progress.hide()
@@ -1763,7 +1773,22 @@ class PassCoreUI(QMainWindow):
         self.backup_progress.hide()
 
     def restore_backup_now(self):
-        restore_backup(self, finished_callback=self.restoreFinished.emit)
+        filepath,_ = QFileDialog.getOpenFileName(
+            self, "Select Beckup zip",
+            str(Path.home() / "Documents" / "PassCore Backups"), "Zip archives (*.zip)",
+            options=QFileDialog.Option.DontUseNativeDialog
+        )
+        if not filepath:
+            return
+
+        try:
+            self.backup_started()
+            self.utility.restore_backup(filepath)
+            self.on_restore_finished(True)
+
+        except Exception as e:
+            self.on_restore_finished(False)
+            QMessageBox.warning(self, "PassCore Restore", str(e))
         
         self.update_vault_size()
 
@@ -1938,29 +1963,67 @@ class PassCoreUI(QMainWindow):
         )
 
     def import_vault_handler(self):
-        success = import_pcv(self)
-        if not success:
+        filepath,_ = QFileDialog.getOpenFileName(self, "Import PassCore Vault",
+            "",
+            "PassCore Vault (*.pcv)",
+            options=QFileDialog.Option.DontUseNativeDialog
+        )
+        if not filepath:
             return
 
-        self.editor.setPlainText(
-            self.lock_screen
+        reply = QMessageBox.information(self, "Import PassCore Vault",
+            "This will replace the current vault.\n\nContinue.?", QMessageBox.Yes | QMessageBox.No
         )
-        self.editor.setReadOnly(True)
-        self.key = None
-        self.status_label.setText("Locked")
-        self.lock_btn.hide()
-        self.unlock_btn.show()
-        self.save_btn.hide()
-        self.close_btn.setEnabled(True)
+        if reply != QMessageBox.Yes:
+            return
 
-        self.note_list.clear()
-        self.note_title.clear()
-        self.notes = [{
-            "title": "Locked",
-            "content": ""
-        }]
+        try:
+            self.utility.import_pcv(filepath)
 
-        QMessageBox.information(self, "PassCore", "Import complete.\n\nUnlock the imported vault to continue.")
+            self.editor.setPlainText(self.lock_screen)
+            self.editor.setReadOnly(True)
+            self.key = None
+            self.status_label.setText("Locked")
+            self.lock_btn.hide()
+            self.unlock_btn.show()
+            self.save_btn.hide()
+            self.close_btn.setEnabled(True)
+    
+            self.note_list.clear()
+            self.note_title.clear()
+            self.notes = [{
+                "title": "Locked",
+                "content": ""
+            }]
+
+            QMessageBox.information(self, "PassCore", "Import complete.\n\nUnlock the imported vault to continue.")
+
+        except Exception as e:
+            QMessageBox.warning(self, "Import Failed", str(e))
+
+    def export_vault_handler(self):
+        if self.key is None:
+            QMessageBox.information(self, "PassCore", "Unlock the vault before exporting...")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(self, "Export PassCore Vault",
+            "PassCore_vault.pcv",
+            "PassCore Vault (*.pcv)",
+            options=QFileDialog.Option.DontUseNativeDialog
+        )
+
+        if not file_path:
+            return
+
+        try:
+            result = self.utility.export_pcv(file_path)
+            QMessageBox.information(self, "PassCore",
+                f"Vault exported successfully.\n\n"
+                f"{result['path']}"
+            )
+
+        except Exception as e:
+            QMessageBox.critical(self, "Export Failed", str(e))
 
     def change_autolock_timer(self):
         current = self.settings["auto_lock_min"]
@@ -2420,12 +2483,12 @@ class PasswordGenerator(QDialog):
         self.output.setText(password)
 
 class VaultHealthDialog(QDialog):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.settings = load_settings()
         self.apply_themes()
-        report = vault_health()
-        images_report = images_health()
+        report = parent.utility.vault_health()
+        images_report = parent.utility.images_health()
         self.setWindowTitle("Vault Health")
         self.setFixedSize(500, 650)
 

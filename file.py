@@ -1,6 +1,5 @@
-import zipfile, shutil, tempfile, json, platform, os, backup
+import platform, os
 from pathlib import Path
-from backup import META_FILE, SALT_FILE, SETTINGS, IMAGES_META, secure_del_tree
 from PySide6.QtWidgets import (QMessageBox, QFileDialog)
 from security.yaml_secure import secure_load, convert_yaml_to_text, VaultValidationError
 
@@ -83,66 +82,3 @@ def import_txt(window):
 
         except Exception as e:
             QMessageBox.critical(window, "Import Failed", str(e))
-
-def import_pcv(window):    
-    file_path, _ = QFileDialog.getOpenFileName(
-        window, "Import PassCore Vault", "","PassCore Vault (*.pcv)",
-        options=QFileDialog.Option.DontUseNativeDialog
-    )
-    if not file_path:
-        return
-    
-    reply = QMessageBox.question(
-        window, "Import PassCore Vault", "This will replace the current vault.\n\nContinue.?", QMessageBox.Yes | QMessageBox.No
-    )
-    if reply != QMessageBox.Yes:
-        return
-    
-    try:
-        with zipfile.ZipFile(file_path, "r") as archive:
-            archive.extractall(CONTAINER_DIR)
-
-        shutil.move(CONTAINER_DIR / "notes_index.json", META_FILE)
-        shutil.move(CONTAINER_DIR / "vault.salt", SALT_FILE)
-        shutil.move(CONTAINER_DIR / "settings.yaml", SETTINGS)
-        shutil.move(CONTAINER_DIR / "images_index.json", IMAGES_META)
-
-        return True
-        
-    except Exception as e:
-        QMessageBox.critical(window, "Import Failed.!", str(e))
-        return False
-
-def export_pcv(window):
-    if window.key is None:
-        QMessageBox.information(window, "PassCore", "Unlock the vault before exporting...")
-        return
-    
-    if not META_FILE.exists():
-        QMessageBox.warning(window, "PassCore", "No vault available to export.!") # prevents exporting a corrupted/uninitialized vault state.
-
-    file_path, _ = QFileDialog.getSaveFileName(
-        window, "Export PassCore Vault", "PassCore_vault.pcv", "PassCore Vault (*.pcv)",
-        options=QFileDialog.Option.DontUseNativeDialog
-    )
-    if not file_path:
-        return
-    
-    if not file_path.endswith(".pcv"):
-        file_path += ".pcv"
-    
-    try:
-        with zipfile.ZipFile(file_path, "w", compression=zipfile.ZIP_DEFLATED) as export_to_zip: # writes splitted blobs into zipfile for backup
-            export_to_zip.write(SALT_FILE, arcname=SALT_FILE.name)
-            export_to_zip.write(META_FILE, arcname=META_FILE.name)
-            export_to_zip.write(SETTINGS, arcname=SETTINGS.name)
-            export_to_zip.write(IMAGES_META, arcname=IMAGES_META.name)
-
-            for file in CONTAINER_DIR.rglob("*"):
-                if file.is_file():
-                    export_to_zip.write(file, arcname=file.relative_to(CONTAINER_DIR))
-        
-        QMessageBox.information(window, "PassCore", f"Vault exported successfully.\n\n{file_path}")
-
-    except Exception as e:
-        QMessageBox.critical(window, "Export Failed.!", str(e))
