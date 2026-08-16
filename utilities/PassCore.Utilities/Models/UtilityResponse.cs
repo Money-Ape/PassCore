@@ -14,7 +14,7 @@ public sealed class UtilityResponse{
     public static UtilityResponse Fail(string error){
         return new UtilityResponse{
             Success = false,
-            Data = error
+            Error = error
         };
     }
 }
