@@ -1,6 +1,8 @@
 ﻿using System.Text.Json;
 using PassCore.Utilities.Backup;
 using PassCore.Utilities.Core;
+using PassCore.Utilities.File;
+using PassCore.Utilities.Health;
 using PassCore.Utilities.Models;
 
 namespace PassCore.Utilities;
@@ -43,8 +45,12 @@ public static class Program{
 
     public static UtilityResponse Dispatch(UtilityRequest request){
         return request.Operation switch{
+            "vault_health" => HealthService.GetVaultHealth(),
+            "images_health" => HealthService.GetImagesHealth(),
             "backup_create" => BackupService.Create(request.Force),
             "backup_restore" => BackupService.Restore(request.Path),
+            "vault_export" => VaultFileService.ExportPcv(request.Destination),
+            "vault_import" => VaultFileService.ImportPcv(request.Path),
 
             _ => UtilityResponse.Fail($"Unknown operation: {request.Operation}")
         };
