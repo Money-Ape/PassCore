@@ -7,21 +7,22 @@ namespace PassCore.Utilities.Backup;
 
 public static class BackupService{
     private const int MaxBackups = 10;
+    public static bool vaultChanged = false;
 
-    // DELETE DIRECTORY CONTENTS
-    public static void DeleteDirectoryContents(string directory){
-        if (!Directory.Exists(directory)){return;}
+    public static UtilityResponse MarkVaultChanged(){
+        vaultChanged = true;
 
-        foreach (string file in Directory.EnumerateFiles(directory, "*", System.IO.SearchOption.AllDirectories)){
-            System.IO.File.Delete(file);
-        }
-        foreach (string dir in Directory.EnumerateDirectories(directory, "*", System.IO.SearchOption.AllDirectories).OrderByDescending(x => x.Length)){
-            Directory.Delete(dir);
-        }
+        return UtilityResponse.Ok(new{changed = true});
     }
 
     // CREATE BACKUPS
     public static UtilityResponse Create(bool force){
+        if (!force && !vaultChanged){
+            return UtilityResponse.Ok(new{
+                changed = false,
+                reason = "vault_unchanged"
+            });
+        }
         try{
            PassCorePaths.EnsureDirectories();
            string[] requiredFiles = {
@@ -54,14 +55,17 @@ public static class BackupService{
                 }
             }
             RotateBackups();
+            vaultChanged = false;
 
             return UtilityResponse.Ok(new{
+                created = true,
                 path = backupPath,
                 size = new FileInfo(backupPath).Length
             });
         }
 
         catch (Exception ex){
+            vaultChanged = true;
             return UtilityResponse.Fail($"Backup Failed: {ex.Message}");
         }
     }
@@ -92,7 +96,7 @@ public static class BackupService{
             }
 
             // Do not destroy the existing vault until the archive has passed basic structural checks.
-            DeleteDirectoryContents(PassCorePaths.ContainerDirectory);
+            DeleteDirectoryContents.DDC(PassCorePaths.ContainerDirectory);
 
             Directory.CreateDirectory(PassCorePaths.ContainerDirectory);
             MoveFile.Move(Path.Combine(stagingDirectory, "vault.salt"), PassCorePaths.SaltFile);
