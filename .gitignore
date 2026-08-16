@@ -5,6 +5,17 @@
 *.exe
 deb-venv/
 
+# C# Project
+utilities/PassCore.Utilities/bin/Debug/net10.0/...
+utilities/PassCore.Utilities/obj/Debug/net10.0/...
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
 packaging/linux/passcore_x86_64/src
 packaging/linux/passcore_x86_64/pkg
 packaging/linux/passcore_x86_64/PassCore
