@@ -553,6 +553,33 @@ Backup retention automatically removes older backups after the configured limit 
 
 ---
 
+## Utility Bridge (.NET)
+
+Vault health diagnostics, backup creation/restoration, and vault export/import (`.pcv`) are implemented in C# (.NET) rather than pure Python. The PySide6 application talks to a compiled .NET process through a lightweight JSON-over-stdio bridge (`passcore_util.py`).
+
+```text
+PySide6 Application
+        ↓
+passcore_util.py (subprocess bridge)
+        ↓
+   JSON over stdin/stdout
+        ↓
+PassCore.Utilities (.NET process)
+        ↓
+HealthService / BackupService / VaultFileService
+```
+
+The utility must be built before these features will work — it is not committed to the repository:
+
+```bash
+cd utilities/PassCore.Utilities
+dotnet build
+```
+
+This produces `bin/Debug/net10.0/PassCore.Utilities` (`PassCore.Utilities.exe` on Windows), which `passcore_util.py` locates automatically. Rebuild any time a `.cs` file under `utilities/` changes.
+
+---
+
 ## Current Capabilities
 
 ### Vault Operations
@@ -660,6 +687,7 @@ Backup retention automatically removes older backups after the configured limit 
 * cryptography
 * argon2-cffi
 * PySide6
+* .NET SDK 10.0 — required to build the vault utility bridge (see [Utility Bridge](#utility-bridge-net) below)
 
 ---
 
@@ -691,6 +719,12 @@ sudo pacman -U passcore_0.4.1_x86_64.pkg.tar.zst
 git clone https://github.com/Money-Ape/PassCore.git
 cd PassCore
 
+# Build the .NET vault utility (required for backups, restore,
+# health diagnostics, and vault export/import — see Utility Bridge above)
+cd utilities/PassCore.Utilities
+dotnet build
+cd ../..
+
 chmod +x run.sh
 ./run.sh
 ```
@@ -700,6 +734,10 @@ chmod +x run.sh
 ```text
 git clone https://github.com/Money-Ape/PassCore.git
 cd PassCore
+
+cd utilities\PassCore.Utilities
+dotnet build
+cd ..\..
 
 Double-click windows.bat
 ```
@@ -711,6 +749,8 @@ The Windows launcher automatically:
 * Launches PassCore
 
 The Linux launcher performs equivalent dependency checks and initialization.
+
+The `dotnet build` step above builds the .NET vault utility bridge (see [Utility Bridge](#utility-bridge-net)) and is currently a manual, one-time step — it is not yet handled automatically by `run.sh` or `windows.bat`.
 
 ---
 
