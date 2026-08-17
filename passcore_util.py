@@ -1,5 +1,6 @@
 import json, os, queue, subprocess, threading
 from pathlib import Path
+from threading import Lock
 
 class PassCoreUtilityError(Exception):
     pass
@@ -40,6 +41,7 @@ class PassCoreUtility:
 
         self._stdout_queue: "queue.Queue[str]" = queue.Queue()
         self._stderr_lines: list[str] = []
+        self._request_lock = Lock()
 
         self._stdout_thread = threading.Thread(target=self._read_stdout, daemon=True)
         self._stdout_thread.start()
@@ -62,6 +64,14 @@ class PassCoreUtility:
         for line in self.process.stderr:
             self._stderr_lines.append(line)
 
+    def _dead_process_error(self):
+        exit_code = self.process.poll()
+        stderr = "".join(self._stderr_lines)
+        return PassCoreUtilityError(
+            f"PassCore utility process is no longer running "
+            f"(exit code {exit_code}).\n{stderr}"
+        )
+
     def _request(self, operation, timeout=DEFAULT_TIMEOUT, **kwargs):
         request = {
             "operation": operation,
@@ -71,30 +81,45 @@ class PassCoreUtility:
         if self.process.stdin is None:
             raise PassCoreUtilityError("Utility stdin is unavailable.")
 
-        try:
-            self.process.stdin.write(json.dumps(request) + "\n")
-            self.process.stdin.flush()
+        with self._request_lock:
+            if self.process.poll() is not None:
+                raise self._dead_process_error()
 
-        except BrokenPipeError as exc:
-            stderr = "".join(self._stderr_lines)
-            raise PassCoreUtilityError(f"PassCore utility process is no longer running.\n{stderr}") from exc
+            try:
+                self.process.stdin.write(json.dumps(request) + "\n")
+                self.process.stdin.flush()
+            except OSError as exc:
+                if self.process.poll() is not None:
+                    raise self._dead_process_error() from exc
+                raise PassCoreUtilityError(f"Failed to write to PassCore utility: {exc}") from exc
 
-        try:
-            response_line = self._stdout_queue.get(timeout=timeout)
-        except queue.Empty:
-            raise PassCoreUtilityError(f"PassCore utility did not respond within {timeout} seconds.")
+            try:
+                response_line = self._stdout_queue.get(timeout=timeout)
+            except queue.Empty:
+                raise PassCoreUtilityError(
+                    f"PassCore utility did not respond within {timeout} seconds."
+                )
 
-        if not response_line:
-            stderr = "".join(self._stderr_lines)
-            raise PassCoreUtilityError(f"PassCore utility stopped unexpectedly.\n{stderr}")
+            if not response_line:
+                stderr = "".join(self._stderr_lines)
+                raise PassCoreUtilityError(
+                    f"PassCore utility stopped unexpectedly.\n{stderr}"
+                )
 
-        try:
-            response = json.loads(response_line)
-        except json.JSONDecodeError as exc:
-            raise PassCoreUtilityError(f"Invalid response from PassCore utility:\n{response_line}") from exc
+            try:
+                response = json.loads(response_line)
+            except json.JSONDecodeError as exc:
+                raise PassCoreUtilityError(
+                    f"Invalid response from PassCore utility:\n{response_line}"
+                ) from exc
 
         if not response.get("success", False):
-            raise PassCoreUtilityError(response.get("error", "Unknown PassCore utility error."))
+            raise PassCoreUtilityError(
+                response.get(
+                    "error",
+                    "Unknown PassCore utility error."
+                )
+            )
 
         return response.get("data")
 
@@ -111,15 +136,21 @@ class PassCoreUtility:
         return self._request("backup_create", force=force)
 
     def restore_backup(self, path):
-        return self._request("backup_restore", path=str(path))
+        return self._request("backup_restore", path=str(path), timeout=120)
 
     def export_pcv(self, destination):
-        return self._request("vault_export", destination=str(destination))
+        return self._request("vault_export", destination=str(destination), timeout=120)
 
     def import_pcv(self, path):
-        return self._request("vault_import", path=str(path))
+        return self._request("vault_import", path=str(path), timeout=120)
 
     def close(self):
+        if self.process.stdin is not None:
+            try:
+                self.process.stdin.close()
+            except OSError:
+                pass
+
         if self.process.poll() is None:
             self.process.terminate()
 
