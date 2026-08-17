@@ -3,6 +3,16 @@ from pathlib import Path
 from PySide6.QtWidgets import (QMessageBox, QFileDialog)
 from security.yaml_secure import secure_load, convert_yaml_to_text, VaultValidationError
 
+def get_PassCore_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path.home() / ".local" / "share" / "passcore"
+    
+    elif sys == "Windows":
+        return Path(os.getenv("APPDATA")) / "PassCore"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
+
 def get_container_dir():
     sys = platform.system()
     if sys == "Linux":
@@ -14,6 +24,41 @@ def get_container_dir():
         raise RuntimeError(f"Unsupported OS: {sys}")
 
 CONTAINER_DIR = get_container_dir()
+PASSCORE_DIR = get_PassCore_dir()
+
+CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
+PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
+SALT_FILE = PASSCORE_DIR / "vault.salt"
+META_FILE = PASSCORE_DIR / "notes_index.json"
+SETTINGS = PASSCORE_DIR / "settings.yaml"
+IMAGES_META = PASSCORE_DIR / "images_index.json"
+
+def secure_del_file(path):
+    if not path.exists():
+        return
+
+    size = path.stat().st_size
+    with open(path, "rb+") as file:
+        file.write(os.urandom(size))
+        file.flush()
+        os.fsync(file.fileno())
+    
+    path.unlink()
+
+def secure_del_tree(dir):
+    dir = Path(dir)
+    if not dir.exists():
+        return
+    
+    files = sorted(dir.rglob("*"), reverse=True)
+    for item in files:
+        if item.is_file():
+            secure_del_file(item)
+        
+        elif item.is_dir():
+            item.rmdir()
+        
+    dir.rmdir()
 
 def import_txt(window):
         if window.key is None:
