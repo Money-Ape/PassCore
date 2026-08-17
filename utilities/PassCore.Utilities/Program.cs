@@ -47,8 +47,11 @@ public static class Program{
         return request.Operation switch{
             "vault_health" => HealthService.GetVaultHealth(),
             "images_health" => HealthService.GetImagesHealth(),
+
+            "backup_mark_changed" => BackupService.MarkVaultChanged(),
             "backup_create" => BackupService.Create(request.Force),
             "backup_restore" => BackupService.Restore(request.Path),
+
             "vault_export" => VaultFileService.ExportPcv(request.Destination),
             "vault_import" => VaultFileService.ImportPcv(request.Path),
 
