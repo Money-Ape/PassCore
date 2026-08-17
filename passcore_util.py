@@ -104,6 +104,9 @@ class PassCoreUtility:
     def images_health(self):
         return self._request("images_health")
 
+    def mark_vault_changed(self):
+        return self._request("backup_mark_changed")
+
     def create_backup(self, force=False):
         return self._request("backup_create", force=force)
 

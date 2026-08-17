@@ -1,6 +1,6 @@
 from gui import PassCoreUI, PasswordDialog, QIcon
-from backup import create_backup, secure_del_tree
-import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes, backup
+from file import secure_del_tree
+import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -273,12 +273,6 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
             if path.exists():
                 secure_del_tree(path)
                 print(f"{GREEN}REMOVED_EXISTING - {container}{RESET}")
-
-def serialize_notes(notes):
-    return json.dumps(notes, ensure_ascii=False)
-
-def deserialize_notes(data):
-    return json.loads(data)
 
 def decrypt_vault(key, encrypted_blobs):
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
@@ -645,16 +639,15 @@ def save_vault(window, editor, key):
     
     encrypt_vault(window.notes, key)
 
-    window.backup_started()
-    backup.vault_changed = True
-    create_backup(finished_callback=window.backupFinished.emit)
+    window.utility.mark_vault_changed()
+    print(f"\n{YELLOW}creating Backup...{RESET}")
+    window.start_backup(force=False)
 
     window.update_vault_size()
     timestamp = datetime.now().strftime("%I:%M:%S %p")
     window.save_label.setText(
         f"Last Save\n{timestamp}"
     )
-    # QMessageBox.information(None, "PassCore", "Vault saved successfully.!")
 
 def vault_close(window, key):
     reply = QMessageBox.question(

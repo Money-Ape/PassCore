@@ -1,13 +1,11 @@
-import sys, os, subprocess, json, ctypes, backup, uuid
+import sys, os, subprocess, json, ctypes, uuid
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent, QColor, QTextCharFormat
-from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal, QThread, QMetaObject, Q_ARG
-from backup import create_backup, restore_backup, META_FILE, secure_del_tree
+from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal, QThread, QMetaObject, QObject, Q_ARG
 from passgen import generate_password
-from health import vault_health, images_health
-from file import import_txt
+from file import import_txt, META_FILE, secure_del_tree
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
 from pcvmenu.images import import_image, load_preview, IMAGES_META, CONTAINER_DIR
@@ -25,9 +23,6 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class PassCoreUI(QMainWindow):
-    backupFinished = Signal(bool)
-    restoreFinished = Signal(bool)
-
     def __init__(self, vault_key=None):
         super().__init__()
         self.vault_key = vault_key
@@ -96,8 +91,6 @@ class PassCoreUI(QMainWindow):
             "mhae qrnli xouar mhnew ilaqr uxwmo qreni hlnwr qmrai"
             "wwwwwwwwwwwwwwwww wwwwwwwwwwwwwwwww wwwwww www\n"
         )
-        self.backupFinished.connect(self.on_backup_finished)
-        self.restoreFinished.connect(self.on_restore_finished)
         self.update_vault_size()
         self.selected_images = set()
         self.vault_text = None
@@ -1023,7 +1016,7 @@ class PassCoreUI(QMainWindow):
         progress.setValue(len(files))
         self.update_album_size(album_name)
         self.load_album(current)
-        backup.vault_changed = True
+        self.utility.mark_vault_changed()
 
     # Open selected images
     def open_selected_image(self, filename, album_name):
@@ -1362,7 +1355,7 @@ class PassCoreUI(QMainWindow):
         QMessageBox.information(
             self, "PassCore", "Image renamed successfully."
         )
-        backup.vault_changed = True
+        self.utility.mark_vault_changed()
 
     def delete_image(self, album_name, filename):
         with open(IMAGES_META, "r") as del_img:
@@ -1382,7 +1375,7 @@ class PassCoreUI(QMainWindow):
             self.load_album(current)
         
         self.update_album_size(album_name)
-        backup.vault_changed = True
+        self.utility.mark_vault_changed()
 
     def clear_gallery(self):
         while self.gallery_layout.count():
@@ -1696,10 +1689,10 @@ class PassCoreUI(QMainWindow):
         with open(META_FILE, "w") as f:
             json.dump(meta, f, indent=4)
 
-        backup.vault_changed = True
+        self.utility.mark_vault_changed()
 
     def show_vault_health(self):
-        dialog = VaultHealthDialog()
+        dialog = VaultHealthDialog(self)
         dialog.exec()
 
     def open_passwd_gen(self):
@@ -1709,25 +1702,44 @@ class PassCoreUI(QMainWindow):
             password = dialog.output.text()
             self.editor.insertPlainText(password)
 
-    def create_backup_now(self):
-        try:
-            self.backup_started()
-            self.utility.create_backup(force=True)
-            self.backup_finished()
-            self.update_vault_size()
+    def start_backup(self, force=False):
+        self.backup_started()
 
-        except Exception as e:
-            self.backup_failed()
-            QMessageBox.warning(self, "PassCore", f"Backup Failed\n\n{e}")
+        self.backup_thread = QThread()
+        self.backup_worker = BackupWorker(self.utility, force)
+
+        self.backup_worker.moveToThread(self.backup_thread)
+        self.backup_thread.started.connect(self.backup_worker.run)
+        self.backup_worker.finished.connect(self.backup_thread.quit)
+
+        self.backup_worker.error.connect(self.backup_thread.quit)
+
+        self.backup_worker.finished.connect(self.on_backup_finished)
+        self.backup_worker.error.connect(self.on_backup_error)
+
+        self.backup_thread.finished.connect(self.backup_worker.deleteLater)
+        self.backup_thread.finished.connect(self.backup_thread.deleteLater)
+
+        self.backup_thread.start()
+
+    def create_backup_now(self):
+        self.utility.mark_vault_changed()
+        self.start_backup(force=True)
 
     def on_backup_finished(self, success):
         self.backup_progress.hide()
         if success:
             self.backup_finished()
+            self.update_vault_size()
+
         else:
             QMessageBox.warning(
                 self, "PassCore", "Backup failed."
             )
+
+    def on_backup_error(self, error):
+        self.backup_failed()
+        QMessageBox.warning(self, "PassCore", f"Backup Failed\n\n{error}")
 
     def on_restore_finished(self, success):
         if success:
@@ -1750,6 +1762,7 @@ class PassCoreUI(QMainWindow):
         self.backup_label.setText(
             f"Backup: Processing..."
         )
+        self.backup_progress.setRange(0, 0)
         self.backup_progress.show()
 
     def backup_finished(self):
@@ -2052,6 +2065,24 @@ class PassCoreUI(QMainWindow):
                 self.loaderThread.wait()
 
         super().closeEvent(event)
+
+class BackupWorker(QObject):
+    finished = Signal(bool)
+    error = Signal(str)
+
+    def __init__(self, utility, force):
+        super().__init__()
+        self.utility = utility
+        self.force = force
+
+    def run(self):
+        try:
+            result = self.utility.create_backup(force=self.force)
+            print(f"{result}\n")
+            self.finished.emit(True)
+
+        except Exception as e:
+            self.error.emit(str(e))
 
 class TimeLineLabel(QLabel):
     def __init__(self, text):
