@@ -35,7 +35,19 @@ public static class PassCorePaths{
     public static string NotesMetaData => Path.Combine(PassCoreDirectory, "notes_index.json");
     public static string ImagesMetaData => Path.Combine(PassCoreDirectory, "images_index.json");
     public static string SettingsFile => Path.Combine(PassCoreDirectory, "settings.yaml");
-    public static string BackupDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "PassCore Backups");
+
+    public static string BackupDirectory{
+        get{
+            if (OperatingSystem.IsLinux()){
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "passcore_backups");
+            }
+            if (OperatingSystem.IsWindows()){
+                string localappData = Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? throw new InvalidOperationException("LOCALAPPDATA environment variable is not available.!");
+                return Path.Combine(localappData, "PassCore Backups");
+            }
+            throw new PlatformNotSupportedException($"Unsupported operating system: {RuntimeInformation.OSDescription}");
+        }
+    }
 
     public static void EnsureDirectories(){
         Directory.CreateDirectory(PassCoreDirectory);
