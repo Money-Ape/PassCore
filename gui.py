@@ -1722,6 +1722,66 @@ class PassCoreUI(QMainWindow):
 
         self.backup_thread.start()
 
+    def start_restore(self, filepath):
+        self.backup_started()
+
+        self.restore_thread = QThread()
+        self.restore_worker = RestoreWorker(self.utility, filepath)
+
+        self.restore_worker.moveToThread(self.restore_thread)
+        self.restore_thread.started.connect(self.restore_worker.run)
+        self.restore_worker.finished.connect(self.restore_thread.quit)
+
+        self.restore_worker.error.connect(self.restore_thread.quit)
+
+        self.restore_worker.finished.connect(self.on_restore_finished)
+        self.restore_worker.error.connect(self.on_restore_error)
+
+        self.restore_thread.finished.connect(self.restore_worker.deleteLater)
+        self.restore_thread.finished.connect(self.restore_thread.deleteLater)
+
+        self.restore_thread.start()
+
+    def start_import(self, filepath):
+        self.import_started()
+
+        self.import_thread = QThread()
+        self.import_worker = ImportWorker(self.utility, filepath)
+
+        self.import_worker.moveToThread(self.import_thread)
+        self.import_thread.started.connect(self.import_worker.run)
+        self.import_worker.finished.connect(self.import_thread.quit)
+
+        self.import_worker.error.connect(self.import_thread.quit)
+
+        self.import_worker.finished.connect(self.on_import_finished)
+        self.import_worker.error.connect(self.on_import_error)
+
+        self.import_thread.finished.connect(self.import_worker.deleteLater)
+        self.import_thread.finished.connect(self.import_thread.deleteLater)
+
+        self.import_thread.start()
+
+    def start_export(self, filepath):
+        self.export_started()
+
+        self.export_thread = QThread()
+        self.export_worker = ExportWorker(self.utility, filepath)
+
+        self.export_worker.moveToThread(self.export_thread)
+        self.export_thread.started.connect(self.export_worker.run)
+        self.export_worker.finished.connect(self.export_thread.quit)
+
+        self.export_worker.error.connect(self.export_thread.quit)
+
+        self.export_worker.finished.connect(self.on_export_finished)
+        self.export_worker.error.connect(self.on_export_error)
+
+        self.export_thread.finished.connect(self.export_worker.deleteLater)
+        self.export_thread.finished.connect(self.export_thread.deleteLater)
+
+        self.export_thread.start()
+
     def create_backup_now(self):
         self.utility.mark_vault_changed()
         self.start_backup(force=True)
@@ -1754,9 +1814,16 @@ class PassCoreUI(QMainWindow):
             self.close_btn.setEnabled(True)
             self.restore_finished()
         else:
+            self.backup_failed()
             QMessageBox.critical(
                 self, "PassCore Restore", "Restore Failed.!"
             )
+        self.update_vault_size()
+
+    def on_restore_error(self, error):
+        self.backup_failed()
+        QMessageBox.critical(self, "PassCore Restore", f"Restore Failed\n\n{error}")
+        self.update_vault_size()
 
     def backup_started(self):
         self.backup_label.setText(
@@ -1785,28 +1852,48 @@ class PassCoreUI(QMainWindow):
         )
         self.backup_progress.hide()
 
+    def import_started(self):
+        self.backup_label.setText(f"Vault: Importing...")
+        self.backup_progress.setRange(0, 0)
+        self.backup_progress.show()
+
+    def import_finished_label(self):
+        timestamp = datetime.now().strftime("%I:%M:%S %p")
+        self.backup_label.setText(f"Vault: Imported\n{timestamp}")
+        self.backup_progress.hide()
+
+    def import_failed_label(self):
+        self.backup_label.setText(f"Vault: Import Failed.!")
+        self.backup_progress.hide()
+
+    def export_started(self):
+        self.backup_label.setText(f"Vault: Exporting...")
+        self.backup_progress.setRange(0, 0)
+        self.backup_progress.show()
+
+    def export_finished_label(self):
+        timestamp = datetime.now().strftime("%I:%M:%S %p")
+        self.backup_label.setText(f"Vault: Exported\n{timestamp}")
+        self.backup_progress.hide()
+
+    def export_failed_label(self):
+        self.backup_label.setText(f"Vault: Export Failed.!")
+        self.backup_progress.hide()
+
     def restore_backup_now(self):
         filepath,_ = QFileDialog.getOpenFileName(
             self, "Select Beckup zip",
-            str(Path.home() / "Documents" / "PassCore Backups"), "Zip archives (*.zip)",
+            str(Path(os.getenv("LOCALAPPDATA")) / "PassCore Backups"), "Zip archives (*.zip)",
             options=QFileDialog.Option.DontUseNativeDialog
         )
         if not filepath:
             return
 
-        try:
-            self.backup_started()
-            self.utility.restore_backup(filepath)
-            self.on_restore_finished(True)
-
-        except Exception as e:
-            self.on_restore_finished(False)
-            QMessageBox.warning(self, "PassCore Restore", str(e))
-        
-        self.update_vault_size()
+        print("restoring from backups...")
+        self.start_restore(filepath)
 
     def open_backup_folder(self):
-        backup_dir = Path.home() / "Documents" / "PassCore Backups"
+        backup_dir = Path(os.getenv("LOCALAPPDATA")) / "PassCore Backups"
         backup_dir.mkdir(parents=True, exist_ok=True)
 
         if sys.platform.startswith("linux"):
@@ -1990,29 +2077,37 @@ class PassCoreUI(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
-        try:
-            self.utility.import_pcv(filepath)
+        self.start_import(filepath)
 
-            self.editor.setPlainText(self.lock_screen)
-            self.editor.setReadOnly(True)
-            self.key = None
-            self.status_label.setText("Locked")
-            self.lock_btn.hide()
-            self.unlock_btn.show()
-            self.save_btn.hide()
-            self.close_btn.setEnabled(True)
-    
-            self.note_list.clear()
-            self.note_title.clear()
-            self.notes = [{
-                "title": "Locked",
-                "content": ""
-            }]
+    def on_import_finished(self, success):
+        if not success:
+            self.import_failed_label()
+            QMessageBox.warning(self, "Import Failed", "Import failed.")
+            return
 
-            QMessageBox.information(self, "PassCore", "Import complete.\n\nUnlock the imported vault to continue.")
+        self.import_finished_label()
 
-        except Exception as e:
-            QMessageBox.warning(self, "Import Failed", str(e))
+        self.editor.setPlainText(self.lock_screen)
+        self.editor.setReadOnly(True)
+        self.key = None
+        self.status_label.setText("Locked")
+        self.lock_btn.hide()
+        self.unlock_btn.show()
+        self.save_btn.hide()
+        self.close_btn.setEnabled(True)
+
+        self.note_list.clear()
+        self.note_title.clear()
+        self.notes = [{
+            "title": "Locked",
+            "content": ""
+        }]
+
+        QMessageBox.information(self, "PassCore", "Import complete.\n\nUnlock the imported vault to continue.")
+
+    def on_import_error(self, error):
+        self.import_failed_label()
+        QMessageBox.warning(self, "Import Failed", error)
 
     def export_vault_handler(self):
         if self.key is None:
@@ -2028,15 +2123,18 @@ class PassCoreUI(QMainWindow):
         if not file_path:
             return
 
-        try:
-            result = self.utility.export_pcv(file_path)
-            QMessageBox.information(self, "PassCore",
-                f"Vault exported successfully.\n\n"
-                f"{result['path']}"
-            )
+        self.start_export(file_path)
 
-        except Exception as e:
-            QMessageBox.critical(self, "Export Failed", str(e))
+    def on_export_finished(self, result):
+        self.export_finished_label()
+        QMessageBox.information(self, "PassCore",
+            f"Vault exported successfully.\n\n"
+            f"{result.get('path', '')}"
+        )
+
+    def on_export_error(self, error):
+        self.export_failed_label()
+        QMessageBox.critical(self, "Export Failed", error)
 
     def change_autolock_timer(self):
         current = self.settings["auto_lock_min"]
@@ -2080,6 +2178,59 @@ class BackupWorker(QObject):
             result = self.utility.create_backup(force=self.force)
             print(f"{result}\n")
             self.finished.emit(True)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+class RestoreWorker(QObject):
+    finished = Signal(bool)
+    error = Signal(str)
+
+    def __init__(self, utility, filepath):
+        super().__init__()
+        self.utility = utility
+        self.filepath = filepath
+
+    def run(self):
+        try:
+            result = self.utility.restore_backup(self.filepath)
+            print(f"{result}\n")
+            self.finished.emit(True)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+class ImportWorker(QObject):
+    finished = Signal(bool)
+    error = Signal(str)
+
+    def __init__(self, utility, filepath):
+        super().__init__()
+        self.utility = utility
+        self.filepath = filepath
+
+    def run(self):
+        try:
+            result = self.utility.import_pcv(self.filepath)
+            print(f"{result}\n")
+            self.finished.emit(True)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+class ExportWorker(QObject):
+    finished = Signal(dict)
+    error = Signal(str)
+
+    def __init__(self, utility, filepath):
+        super().__init__()
+        self.utility = utility
+        self.filepath = filepath
+
+    def run(self):
+        try:
+            result = self.utility.export_pcv(self.filepath)
+            self.finished.emit(result or {})
 
         except Exception as e:
             self.error.emit(str(e))
