@@ -37,31 +37,38 @@ public static class BackupService{
                     return UtilityResponse.Fail($"Required vault File is missing: {file}");
                 }
             }
+            Directory.CreateDirectory(PassCorePaths.BackupDirectory);
+
             string timestamp = DateTime.Now.ToString("ddMMyyyyHHmmss");
             string backupPath = Path.Combine(PassCorePaths.BackupDirectory, $"passcore_backup_{timestamp}.zip");
 
+            long backupSize;
+
             using (FileStream stream = new FileStream(backupPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)){
-                using ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Create);
+                using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Create)){
+                    AddFile.AddTo(archive, PassCorePaths.SaltFile, Path.GetFileName(PassCorePaths.SaltFile));
+                    AddFile.AddTo(archive, PassCorePaths.NotesMetaData, Path.GetFileName(PassCorePaths.NotesMetaData));
+                    AddFile.AddTo(archive, PassCorePaths.ImagesMetaData, Path.GetFileName(PassCorePaths.ImagesMetaData));
+                    AddFile.AddTo(archive, PassCorePaths.SettingsFile, Path.GetFileName(PassCorePaths.SettingsFile));
 
-                AddFile.AddTo(archive, PassCorePaths.SaltFile, Path.GetFileName(PassCorePaths.SaltFile));
-                AddFile.AddTo(archive, PassCorePaths.NotesMetaData, Path.GetFileName(PassCorePaths.NotesMetaData));
-                AddFile.AddTo(archive, PassCorePaths.ImagesMetaData, Path.GetFileName(PassCorePaths.ImagesMetaData));
-                AddFile.AddTo(archive, PassCorePaths.SettingsFile, Path.GetFileName(PassCorePaths.SettingsFile));
-
-                if (Directory.Exists(PassCorePaths.ContainerDirectory)){
-                    foreach(string file in Directory.EnumerateFiles(PassCorePaths.ContainerDirectory, "*", System.IO.SearchOption.AllDirectories)){
-                        string relative = Path.GetRelativePath(PassCorePaths.ContainerDirectory, file);
-                        AddFile.AddTo(archive, file, relative);
+                    if (Directory.Exists(PassCorePaths.ContainerDirectory)){
+                        foreach(string file in Directory.EnumerateFiles(PassCorePaths.ContainerDirectory, "*", System.IO.SearchOption.AllDirectories)){
+                            string relative = Path.GetRelativePath(PassCorePaths.ContainerDirectory, file);
+                            AddFile.AddTo(archive, file, relative);
+                        }
                     }
                 }
+                stream.Flush();
+                backupSize = stream.Length;
             }
+
             RotateBackups();
             vaultChanged = false;
 
             return UtilityResponse.Ok(new{
                 created = true,
                 path = backupPath,
-                size = new FileInfo(backupPath).Length
+                size = backupSize
             });
         }
 
@@ -130,6 +137,8 @@ public static class BackupService{
 
     // ROTATE BACKUPS
     public static void RotateBackups(){
+        if (!Directory.Exists(PassCorePaths.BackupDirectory)){return;}
+
         DirectoryInfo directory = new DirectoryInfo(PassCorePaths.BackupDirectory);
         FileInfo[] backups = directory.GetFiles("*.zip").OrderBy(x => x.CreationTimeUtc).ToArray();
 
