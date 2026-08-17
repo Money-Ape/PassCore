@@ -42,8 +42,6 @@ public static class BackupService{
             string timestamp = DateTime.Now.ToString("ddMMyyyyHHmmss");
             string backupPath = Path.Combine(PassCorePaths.BackupDirectory, $"passcore_backup_{timestamp}.zip");
 
-            long backupSize;
-
             using (FileStream stream = new FileStream(backupPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)){
                 using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Create)){
                     AddFile.AddTo(archive, PassCorePaths.SaltFile, Path.GetFileName(PassCorePaths.SaltFile));
@@ -58,9 +56,9 @@ public static class BackupService{
                         }
                     }
                 }
-                stream.Flush();
-                backupSize = stream.Length;
             }
+
+            long backupSize = new FileInfo(backupPath).Length;
 
             RotateBackups();
             vaultChanged = false;
