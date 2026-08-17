@@ -1,4 +1,4 @@
-import sys, os, subprocess, json, ctypes, uuid
+import sys, os, subprocess, json, ctypes, uuid, platform
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
@@ -21,6 +21,19 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
+
+def get_backup_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path.home() / ".local" / "share" / "passcore_backups"
+    
+    elif sys == "Windows":
+        return Path(os.getenv("LOCALAPPDATA")) / "PassCore Backups"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
+
+BACKUP_DIR = get_backup_dir()
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 class PassCoreUI(QMainWindow):
     def __init__(self, vault_key=None):
@@ -1883,7 +1896,7 @@ class PassCoreUI(QMainWindow):
     def restore_backup_now(self):
         filepath,_ = QFileDialog.getOpenFileName(
             self, "Select Beckup zip",
-            str(Path(os.getenv("LOCALAPPDATA")) / "PassCore Backups"), "Zip archives (*.zip)",
+            str(Path(BACKUP_DIR)), "Zip archives (*.zip)",
             options=QFileDialog.Option.DontUseNativeDialog
         )
         if not filepath:
@@ -1893,8 +1906,7 @@ class PassCoreUI(QMainWindow):
         self.start_restore(filepath)
 
     def open_backup_folder(self):
-        backup_dir = Path(os.getenv("LOCALAPPDATA")) / "PassCore Backups"
-        backup_dir.mkdir(parents=True, exist_ok=True)
+        backup_dir = Path(BACKUP_DIR)
 
         if sys.platform.startswith("linux"):
             subprocess.Popen(
