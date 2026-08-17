@@ -7,7 +7,7 @@ namespace PassCore.Utilities.Backup;
 
 public static class BackupService{
     private const int MaxBackups = 10;
-    public static bool vaultChanged = false;
+    private static bool vaultChanged = false;
 
     public static UtilityResponse MarkVaultChanged(){
         vaultChanged = true;
@@ -19,6 +19,7 @@ public static class BackupService{
     public static UtilityResponse Create(bool force){
         if (!force && !vaultChanged){
             return UtilityResponse.Ok(new{
+                created = false,
                 changed = false,
                 reason = "vault_unchanged"
             });
