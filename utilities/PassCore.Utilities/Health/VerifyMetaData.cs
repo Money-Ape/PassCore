@@ -21,4 +21,24 @@ public sealed class VerifyMetaData{
 
         catch{return false;}
     }
+
+    // IMAGE VERIFICATION
+    public static bool VerifyImgMeta(JsonElement meta){
+        try{
+            if (!meta.TryGetProperty("albums", out _)){return false;}
+
+            string[] required = { "uuid", "sha256", "size", "created_at" };
+
+            foreach (var image in HealthService.EnumerateImages(meta)){
+                foreach (string key in required){
+                    if (!image.Info.TryGetProperty(key, out _)){return false;}
+                }
+            }
+            return true;
+        }
+
+        catch{
+            return false;
+        }
+    }
 }
