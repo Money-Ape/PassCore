@@ -578,17 +578,22 @@ Theme changes are applied immediately without restarting the application.
 ```text
 User Interface Layer
         ↓
-Theme Layer
+    Theme Layer
         ↓
-Vault Editor Layer
+Vault Editor / Gallery Layer
         ↓
-Cryptography Layer
+ Cryptography Layer
         ↓
-Storage Layer
+Storage & Metadata Layer
         ↓
-Integrity Layer
+Integrity & Health Layer
         ↓
-Backup Layer
+Python ↔ C# Utility Bridge
+        ↓
+C# Utility Layer
+        ├── Backup / Restore
+        ├── PCV Import / Export
+        └── Vault Health
 ```
 
 PassCore separates storage, integrity verification, encryption, backups, and user interaction into independent layers to simplify future development and maintenance.

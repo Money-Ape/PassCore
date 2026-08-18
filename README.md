@@ -83,12 +83,32 @@ Your data belongs to you.
 ```mermaid
 flowchart LR
 
-MasterPassword --> Argon2id
-Argon2id --> AESGCM
-AESGCM --> DistributedContainers
-DistributedContainers --> IntegrityVerification
-IntegrityVerification --> MemoryReconstruction
-MemoryReconstruction --> VaultEditor
+MP["Master Password"]
+KDF["Argon2id KDF"]
+KEY["256-bit Vault Key"]
+AES["AES-GCM"]
+BLOB["Distributed Encrypted Containers"]
+INDEX["Indexes & Metadata"]
+VERIFY["Integrity Verification"]
+RECON["Memory Reconstruction"]
+APP["Application Layer"]
+EDITOR["Vault Editor"]
+GALLERY["Image Gallery"]
+
+MP --> KDF
+KDF --> KEY
+KEY --> AES
+
+AES --> BLOB
+AES --> INDEX
+INDEX --> VERIFY
+BLOB --> VERIFY
+
+VERIFY --> RECON
+RECON --> APP
+
+APP --> EDITOR
+APP --> GALLERY
 ```
 
 ---
