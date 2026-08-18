@@ -9,49 +9,106 @@ flowchart TD
 %% ==========================================================
 
 MP["Master Password"]
-A["Argon2id"]
+KDF["Argon2id KDF"]
 KEY["256-bit Vault Key"]
 
-MP --> A
-A --> KEY
+MP --> KDF
+KDF --> KEY
+
 
 %% ==========================================================
-%% USER DATA
+%% APPLICATION LAYER
 %% ==========================================================
 
-NOTE["Vault Note"]
-IMAGE["Imported Image"]
+subgraph PY["Python Application Layer"]
 
-NOTE --> ENC
-IMAGE --> ENC
+    APP["PassCore Application"]
 
-ENC["AES-GCM Encryption"]
+    EDITOR["Vault Editor"]
+    GALLERY["Image Gallery"]
+
+    ENC["AES-GCM Encryption"]
+    DEC["AES-GCM Decryption"]
+
+    CACHE["Thumbnail Cache"]
+    PREVIEW["Image Preview"]
+
+    THEME["Theme Engine"]
+    UI["PySide6 UI"]
+
+    APP --> EDITOR
+    APP --> GALLERY
+
+    EDITOR --> ENC
+    GALLERY --> ENC
+
+    DEC --> EDITOR
+    DEC --> GALLERY
+
+    GALLERY --> CACHE
+    CACHE --> PREVIEW
+
+    EDITOR --> THEME
+    PREVIEW --> THEME
+    THEME --> UI
+
+end
+
+
+%% ==========================================================
+%% CRYPTOGRAPHY
+%% ==========================================================
 
 KEY --> ENC
-
 ENC --> RAM1["Encrypted Bytes (RAM)"]
+
+RAM1 --> SPLIT["Blob Splitting"]
+
+SPLIT --> NOTEUUID["Note / Image UUID"]
+
+KEY --> DEC
+
+NOTEUUID --> RECONSTRUCT["Blob Reconstruction"]
+
+RECONSTRUCT --> RAM2["Encrypted Bytes (RAM)"]
+
+RAM2 --> DEC
+
 
 %% ==========================================================
 %% NOTE STORAGE
 %% ==========================================================
 
-RAM1 --> SPLIT["Blob Splitting"]
+subgraph STORAGE["Encrypted Vault Storage"]
 
-SPLIT --> NOTEUUID["Note UUID"]
+    META["metadata.json"]
 
-NOTEUUID --> META["metadata.json"]
+    C1["Container UUID"]
+    C2["Container UUID"]
+    C3["Container UUID"]
 
-META --> C1["Container UUID"]
-META --> C2["Container UUID"]
-META --> C3["Container UUID"]
+    B1["blob_0000.bin"]
+    B2["blob_0001.bin"]
+    B3["blob_0002.bin"]
+    B4["blob_0003.bin"]
+    BN["..."]
 
-C1 --> B1["blob_0000.bin"]
-C1 --> B2["blob_0001.bin"]
+    NOTEUUID --> META
 
-C2 --> B3["blob_0002.bin"]
-C2 --> B4["blob_0003.bin"]
+    META --> C1
+    META --> C2
+    META --> C3
 
-C3 --> BN["..."]
+    C1 --> B1
+    C1 --> B2
+
+    C2 --> B3
+    C2 --> B4
+
+    C3 --> BN
+
+end
+
 
 %% ==========================================================
 %% GLOBAL INDEXES
@@ -61,73 +118,141 @@ INDEX["notes_index.json"]
 IMGINDEX["images_index.json"]
 
 INDEX --> NOTEUUID
-IMGINDEX --> IMAGE
+IMGINDEX --> NOTEUUID
+
 
 %% ==========================================================
-%% INTEGRITY
+%% VAULT FILES
 %% ==========================================================
 
-VERIFY["Integrity Verification"]
+SALT["vault.salt"]
+SETTINGS["settings.yaml"]
 
-INDEX --> VERIFY
-META --> VERIFY
+SALT --> KDF
+
+
+%% ==========================================================
+%% PYTHON ↔ C# BRIDGE
+%% ==========================================================
+
+subgraph BRIDGE["Python ↔ C# Utility Bridge"]
+
+    PYUTIL["passcore_util.py"]
+
+    JSONREQ["JSON Request"]
+    JSONRES["JSON Response"]
+
+    PYUTIL --> JSONREQ
+    JSONRES --> PYUTIL
+
+end
+
+
+%% ==========================================================
+%% C# UTILITY ENGINE
+%% ==========================================================
+
+subgraph CS["PassCore.Utilities — C#"]
+
+    DISPATCH["Program.cs\nOperation Dispatcher"]
+
+    BACKUP["BackupService"]
+    PCV["VaultFileService"]
+    HEALTH["HealthService"]
+
+    DEL["DeleteDirectoryContents"]
+    FILEUTIL["File Utilities"]
+
+    DISPATCH --> BACKUP
+    DISPATCH --> PCV
+    DISPATCH --> HEALTH
+
+    PCV --> DEL
+    PCV --> FILEUTIL
+
+end
+
+
+%% ==========================================================
+%% C# OPERATIONS
+%% ==========================================================
+
+JSONREQ --> DISPATCH
+DISPATCH --> JSONRES
+
+BACKUP --> ZIP["Backup ZIP Archive"]
+ZIP --> RETENTION["Retention Policy\nMax 10 Backups"]
+
+PCV --> PCVFILE[".pcv Archive"]
+
+HEALTH --> VERIFY["Integrity Verification"]
+
+
+%% ==========================================================
+%% BACKUP INPUTS
+%% ==========================================================
+
+INDEX --> BACKUP
+IMGINDEX --> BACKUP
+META --> BACKUP
+SALT --> BACKUP
+SETTINGS --> BACKUP
+B1 --> BACKUP
+B2 --> BACKUP
+B3 --> BACKUP
+B4 --> BACKUP
+BN --> BACKUP
+
+
+%% ==========================================================
+%% PCV EXPORT / IMPORT
+%% ==========================================================
+
+INDEX --> PCV
+IMGINDEX --> PCV
+META --> PCV
+SALT --> PCV
+SETTINGS --> PCV
+
+PCVFILE --> PCV
+
+
+%% ==========================================================
+%% HEALTH CHECKS
+%% ==========================================================
+
+INDEX --> HEALTH
+IMGINDEX --> HEALTH
+META --> HEALTH
 
 VERIFY --> VC["Verify Containers"]
 VC --> VE["Verify Blob Existence"]
 VE --> VS["Verify Blob Size"]
 VS --> VH["Verify SHA-256"]
 
+
 %% ==========================================================
 %% RECONSTRUCTION
 %% ==========================================================
 
-VH --> LOAD["Read Containers"]
+VH --> RECONSTRUCT
 
-LOAD --> MERGE["Blob Reconstruction"]
-
-MERGE --> RAM2["Encrypted Bytes (RAM)"]
-
-RAM2 --> DEC["AES-GCM Decryption"]
-
-KEY --> DEC
 
 %% ==========================================================
-%% APPLICATION
+%% UI → UTILITY OPERATIONS
 %% ==========================================================
 
-DEC --> APP["Application Layer"]
+UI --> PYUTIL
 
-APP --> EDITOR["Vault Editor"]
-APP --> GALLERY["Image Gallery"]
+PYUTIL -->|"vault_health"| HEALTH
+PYUTIL -->|"images_health"| HEALTH
 
-%% ==========================================================
-%% IMAGE CACHE
-%% ==========================================================
+PYUTIL -->|"backup_mark_changed"| BACKUP
+PYUTIL -->|"backup_create"| BACKUP
+PYUTIL -->|"backup_restore"| BACKUP
 
-GALLERY --> CACHE["Thumbnail Cache"]
-
-CACHE --> PREVIEW["Image Preview"]
-
-%% ==========================================================
-%% USER INTERFACE
-%% ==========================================================
-
-EDITOR --> THEME["Theme Engine"]
-PREVIEW --> THEME
-
-THEME --> UI["PassCore UI"]
-
-%% ==========================================================
-%% BACKUPS
-%% ==========================================================
-
-INDEX --> BACKUP["Backup System"]
-IMGINDEX --> BACKUP
-NOTEUUID --> BACKUP
-
-BACKUP --> ZIP["ZIP Archive"]
-
-ZIP --> RETENTION["Retention Policy"]
+PYUTIL -->|"vault_export"| PCV
+PYUTIL -->|"vault_import"| PCV
 ```
 
 ---
