@@ -166,7 +166,7 @@ class PassCoreUtility:
         return self._request("backup_mark_changed")
 
     def create_backup(self, force=False):
-        return self._request("backup_create", force=force)
+        return self._request("backup_create", force=force, timeout=120)
 
     def restore_backup(self, path):
         return self._request("backup_restore", path=str(path), timeout=120)
