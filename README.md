@@ -305,7 +305,7 @@ PassCore separates vault metadata from encrypted storage.
 ~/.local/share/passcore/
 ├── vault.salt
 ├── notes_index.json
-├── settings.json
+├── settings.yaml
 └── images_index.json
 
 ~/.local/share/.passcore_db/
@@ -325,7 +325,7 @@ PassCore separates vault metadata from encrypted storage.
 %APPDATA%\PassCore\
 ├── vault.salt
 ├── notes_index.json
-├── settings.json
+├── settings.yaml
 └── images_index.json
 
 %LOCALAPPDATA%\PassCoreData\
@@ -496,7 +496,7 @@ Backups contain:
 
 * vault.salt
 * notes_index.json
-* settings.json
+* settings.yaml
 * images_index.json
 * All encrypted note directories
 * Image vault storage
@@ -506,13 +506,13 @@ Backups are stored separately from vault storage.
 ### Linux
 
 ```text
-~/Documents/PassCore Backups/
+~/.local/share/passcore_backups/
 ```
 
 ### Windows
 
 ```text
-Documents\PassCore Backups\
+LOCALAPPDATA\PassCore Backups\
 ```
 
 ### Backup Workflow
