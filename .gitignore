@@ -16,6 +16,9 @@ obj/
 *.suo
 .vs/
 
+# publish/<arch>/executables
+utilities/PassCore.Utilities/publish/
+
 packaging/linux/passcore_x86_64/src
 packaging/linux/passcore_x86_64/pkg
 packaging/linux/passcore_x86_64/PassCore
