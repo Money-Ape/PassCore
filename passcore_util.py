@@ -1,6 +1,57 @@
-import json, os, queue, subprocess, threading
+import json, os, queue, subprocess, threading, platform, sys
 from pathlib import Path
 from threading import Lock
+
+def get_utility_path():
+    system = platform.system()
+    machine = platform.machine().lower()
+
+    if system == "Linux":
+        if machine in ("x86_64","amd64"):
+            target = "linux-x64"
+            executable = "PassCore.Utilities"
+
+        elif machine in ("aarch64", "arm64"):
+            target = "linux-arm64"
+            executable = "PassCore.Utilities"
+
+        else:
+            raise RuntimeError(f"UnSupported Linux architecture {machine}")
+
+    elif system == "Windows":
+        if machine in ("x86_64", "amd64"):
+            target = "win-x64"
+            executable = "PassCore.Utilities.exe"
+
+        elif machine in "arm64":
+            target == "win-arm64"
+            executable = "PassCore.Utilities.exe"
+
+        else:
+            raise RuntimeError(f"UnSupported Windows architecture {machine}")
+
+    else:
+        raise RuntimeError(f"UnSupported Operating System {system}")
+
+    # PyInstaller Bundler
+    if getattr(sys, "frozen", False):
+        base = Path(sys._MEIPASS)
+
+    else:
+        base = Path(__file__).resolve().parent
+
+    utility_path = (
+        base
+        / "utilities"
+        / "PassCore.Utilities"
+        / "publish"
+        / target
+        / executable
+    )
+    if not utility_path.is_file():
+        raise FileNotFoundError(f"PassCore.Utilities executable not found.!\n{utility_path}")
+
+    return utility_path
 
 class PassCoreUtilityError(Exception):
     pass
@@ -10,32 +61,14 @@ class PassCoreUtility:
 
     def __init__(self):
         root = Path(__file__).resolve().parent
-        exe_name = "PassCore.Utilities.exe" if os.name == "nt" else "PassCore.Utilities"
 
-        self.utility = (
-            root
-            / "utilities"
-            / "PassCore.Utilities"
-            / "bin"
-            / "Debug"
-            / "net10.0"
-            / exe_name
-        )
-        if not self.utility.exists():
-            raise FileNotFoundError(
-                f"PassCore utility executable not found:\n"
-                f"{self.utility}\n\n"
-                f"Build it first with:\n"
-                f"dotnet build"
-            )
-
+        self.utility_path = get_utility_path()
         self.process = subprocess.Popen(
-            [str(self.utility)],
+            [str(self.utility_path)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding="utf-8",
             bufsize=1,
         )
 
