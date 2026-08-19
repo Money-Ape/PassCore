@@ -81,34 +81,65 @@ Your data belongs to you.
 ---
 
 ```mermaid
-flowchart LR
+flowchart TD
 
-MP["Master Password"]
-KDF["Argon2id KDF"]
-KEY["256-bit Vault Key"]
-AES["AES-GCM"]
-BLOB["Distributed Encrypted Containers"]
-INDEX["Indexes & Metadata"]
-VERIFY["Integrity Verification"]
-RECON["Memory Reconstruction"]
-APP["Application Layer"]
-EDITOR["Vault Editor"]
-GALLERY["Image Gallery"]
+%% ==========================================================
+%% PASSCORE
 
-MP --> KDF
-KDF --> KEY
-KEY --> AES
+PC["PassCore"]
 
-AES --> BLOB
-AES --> INDEX
-INDEX --> VERIFY
-BLOB --> VERIFY
+PC --> PY["Python"]
+PC --> CS["C#"]
 
-VERIFY --> RECON
-RECON --> APP
 
-APP --> EDITOR
-APP --> GALLERY
+%% ==========================================================
+%% PYTHON SIDE
+
+PY --> UI["PySide6 / GUI"]
+PY --> CRYPTO["Cryptography"]
+
+CRYPTO --> KDF["Argon2id"]
+KDF --> KEY["256-bit Vault Key"]
+
+KEY --> AES["AES-GCM"]
+
+AES --> STORAGE["Encrypted Containers"]
+STORAGE --> INTEGRITY["Integrity Verification"]
+INTEGRITY --> RECON["Memory Reconstruction"]
+
+RECON --> EDITOR["Vault Editor"]
+RECON --> GALLERY["Image Gallery"]
+
+
+%% ==========================================================
+%% PYTHON ↔ C# BRIDGE
+
+UI --> JSON["JSON"]
+JSON --> UTIL["PassCore.Utilities"]
+
+
+%% ==========================================================
+%% C# UTILITY ENGINE
+
+CS --> UTIL
+
+UTIL --> FILE["File"]
+UTIL --> HEALTH["Health"]
+UTIL --> BACKUP["Backup"]
+
+FILE --> PCV["PCV Import / Export"]
+HEALTH --> VH["Vault Health"]
+BACKUP --> BR["Create / Restore"]
+
+
+%% ==========================================================
+%% REUSABLE HELPERS
+
+UTIL --> HELPERS["Reusable Helpers"]
+
+HELPERS --> ADD["AddFile"]
+HELPERS --> MOVE["MoveFile"]
+HELPERS --> DELETE["DeleteDirectoryContents"]
 ```
 
 ---
