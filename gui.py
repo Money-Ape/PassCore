@@ -23,14 +23,14 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 def get_backup_dir():
-    sys = platform.system()
-    if sys == "Linux":
+    os_name = platform.system()
+    if os_name == "Linux":
         return Path.home() / ".local" / "share" / "passcore_backups"
     
-    elif sys == "Windows":
+    elif os_name == "Windows":
         return Path(os.getenv("LOCALAPPDATA")) / "PassCore Backups"
     else:
-        raise RuntimeError(f"Unsupported OS: {sys}")
+        raise RuntimeError(f"Unsupported OS: {os_name}")
 
 BACKUP_DIR = get_backup_dir()
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -1909,16 +1909,19 @@ class PassCoreUI(QMainWindow):
         backup_dir = Path(BACKUP_DIR)
 
         if sys.platform.startswith("linux"):
-            subprocess.Popen(
-                ["xdg-open", str(backup_dir)]
-            )
+            try:
+                subprocess.Popen(["xdg-open", str(backup_dir)])
+
+            except FileNotFoundError:
+                QMessageBox.warning(
+                    self, "Unable to Open Folder", "xdg-open is not available on this Linux system.!"
+                )
+
         elif sys.platform == "win32":
             os.startfile(backup_dir)
         
         elif sys.platform == "darwin":
-            subprocess.Popen(
-                ["open", str(backup_dir)]
-            )
+            subprocess.Popen(["open", str(backup_dir)])
 
     def vault_corrupted(self):
         self.key = None
