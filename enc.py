@@ -684,9 +684,9 @@ def user_edit():
             myappid
         )
     print("MEIPASS:", getattr(sys, "_MEIPASS", "NOT SET"))
-    print("EXISTS:", os.path.exists(resource_path("assets/PassCore.ico")))
+    print("EXISTS:", os.path.exists(resource_path("assets/PassCore.png")))
     app = QApplication([])
-    icon = QIcon(resource_path("assets/PassCore.ico"))
+    icon = QIcon(resource_path("assets/PassCore.png"))
 
     app.setWindowIcon(icon)
     window = PassCoreUI()

@@ -43,11 +43,11 @@ class PassCoreUI(QMainWindow):
         self.loader = ImageLoader(self.vault_key)
 
         print("MEIPASS:", getattr(sys, "_MEIPASS", "NOT SET"))
-        print("ICON:", resource_path("assets/PassCore.ico"))
-        print("EXISTS:", os.path.exists(resource_path("assets/PassCore.ico")))
+        print("ICON:", resource_path("assets/PassCore.png"))
+        print("EXISTS:", os.path.exists(resource_path("assets/PassCore.png")))
         self.setWindowTitle("PassCore vault")
         self.setWindowIcon(
-            QIcon(resource_path("assets/PassCore.ico"))
+            QIcon(resource_path("assets/PassCore.png"))
         )
         self.resize(1400, 850)
         self.settings = load_settings()
@@ -2395,7 +2395,7 @@ class PasswordDialog(QDialog):
         self.apply_themes()
         self.confirm = confirm
         self.setWindowTitle(title)
-        self.setWindowIcon(QIcon(resource_path("assets/PassCore.ico")))
+        self.setWindowIcon(QIcon(resource_path("assets/PassCore.png")))
         self.setStyleSheet(f"""
             QDialog {{
                 background-color: {self.w};
