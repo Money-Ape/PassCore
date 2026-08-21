@@ -662,7 +662,14 @@ class PassCoreUI(QMainWindow):
         export_action.triggered.connect(self.export_vault_handler)
         file_menu.addAction(export_action)
 
-        settings_menu = file_menu.addMenu("Settings") # File menu : Settings menu
+        edit_menu = menu.addMenu("Edit") # Edit Menu
+
+        search_action = QAction("Search", self) # Edit menu : Search Menu
+        search_action.setShortcut("Ctrl+F") # Search Shortcut key
+        search_action.triggered.connect(self.toggle_search)
+        edit_menu.addAction(search_action)
+
+        settings_menu = edit_menu.addMenu("Settings") # File menu : Settings menu
         autolock_action = QAction("Auto-Lock Timer", self)
         autolock_action.triggered.connect(self.change_autolock_timer)
         settings_menu.addAction(autolock_action)
@@ -681,20 +688,6 @@ class PassCoreUI(QMainWindow):
             capture_action.toggled.connect(self.toggle_capture_protection)
         
         settings_menu.addAction(capture_action)
-                
-        edit_menu = menu.addMenu("Edit") # Edit Menu 
-        create_backup_action = QAction("Create Backup", self) # Edit menu : Create Backup
-        create_backup_action.triggered.connect(self.create_backup_now)
-        edit_menu.addAction(create_backup_action)
-
-        search_action = QAction("Search", self) # Edit menu : Search Menu
-        search_action.setShortcut("Ctrl+F") # Search Shortcut key
-        search_action.triggered.connect(self.toggle_search)
-        edit_menu.addAction(search_action)
-        
-        restore_backup_action = QAction("Restore Backup", self) # Edit menu : Restore Backup
-        restore_backup_action.triggered.connect(self.restore_backup_now)
-        edit_menu.addAction(restore_backup_action)
         
         view_menu = menu.addMenu("View") # View Menu
         backup_folder_action = QAction("Open Backup Folder", self) # View menu : Backup folder lookup
@@ -702,6 +695,15 @@ class PassCoreUI(QMainWindow):
         view_menu.addAction(backup_folder_action)
         
         tools_menu = menu.addMenu("Tools") # Tools Menu
+
+        create_backup_action = QAction("Create Backup", self) # Edit menu : Create Backup
+        create_backup_action.triggered.connect(self.create_backup_now)
+        tools_menu.addAction(create_backup_action)
+
+        restore_backup_action = QAction("Restore Backup", self) # Edit menu : Restore Backup
+        restore_backup_action.triggered.connect(self.restore_backup_now)
+        tools_menu.addAction(restore_backup_action)
+
         pass_gen_action = QAction("Password Generator", self) # Tool menu : Password Generator
         pass_gen_action.triggered.connect(self.open_passwd_gen)
         tools_menu.addAction(pass_gen_action)
