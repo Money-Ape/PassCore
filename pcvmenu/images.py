@@ -1,7 +1,7 @@
 from PIL import Image
 import sys, os, platform, mimetypes, uuid, hashlib, json, struct
 from pathlib import Path
-from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
+from PySide6.QtWidgets import QMessageBox
 from PySide6.QtGui import QPixmap
 from datetime import datetime
 from io import BytesIO
@@ -245,9 +245,7 @@ def merge_image_bin(filename, album_name):
     with open(IMAGES_META, "r") as ijson:
         merge_i = json.load(ijson)
 
-    with open(IMAGES_META, "r") as am_d:
-        data = json.load(am_d)
-    album_id = next(iter(data["albums"][album_name]))
+    album_id = next(iter(merge_i["albums"][album_name]))
     
     image_ctn = merge_i["albums"][album_name][album_id][filename]["uuid"]
     container_meta = CONTAINER_DIR / album_id / image_ctn / "metadata.json"
