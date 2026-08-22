@@ -46,27 +46,14 @@ def get_PassCore_dir():
     else:
         raise RuntimeError(f"Unsupported OS: {sys}")
         
-def get_cache_dir():
-    sys = platform.system()
-    if sys == "Linux":
-        return Path.home() / ".cache" / "passcore"
-    
-    elif sys == "Windows":
-        return Path(os.getenv("LOCALAPPDATA")) / "PassCore" / "Cache"
-    else:
-        raise RuntimeError(f"Unsupported OS: {sys}")
-
 CONTAINER_DIR = get_container_dir()
 PASSCORE_DIR = get_PassCore_dir()
-CACHE_DIR = get_cache_dir()
 
 CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
 PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
-CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 SALT_FILE = PASSCORE_DIR / "vault.salt"
 META_FILE = PASSCORE_DIR / "notes_index.json"
-CONFIG_FILE =  PASSCORE_DIR / "config.json"
 
 if not SALT_FILE.exists():
     salt = os.urandom(16)
