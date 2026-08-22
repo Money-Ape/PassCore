@@ -1,4 +1,4 @@
-import json, os, queue, subprocess, threading, platform, sys
+import json, queue, subprocess, threading, platform, sys
 from pathlib import Path
 from threading import Lock
 
@@ -60,8 +60,6 @@ class PassCoreUtility:
     DEFAULT_TIMEOUT = 30  # seconds
 
     def __init__(self):
-        root = Path(__file__).resolve().parent
-
         self.utility_path = get_utility_path()
         self.process = subprocess.Popen(
             [str(self.utility_path)],
