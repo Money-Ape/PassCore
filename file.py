@@ -28,10 +28,7 @@ PASSCORE_DIR = get_PassCore_dir()
 
 CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
 PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
-SALT_FILE = PASSCORE_DIR / "vault.salt"
 META_FILE = PASSCORE_DIR / "notes_index.json"
-SETTINGS = PASSCORE_DIR / "settings.yaml"
-IMAGES_META = PASSCORE_DIR / "images_index.json"
 
 def secure_del_file(path):
     if not path.exists():
