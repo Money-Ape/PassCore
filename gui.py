@@ -42,9 +42,6 @@ class PassCoreUI(QMainWindow):
 
         self.loader = ImageLoader(self.vault_key)
 
-        print("MEIPASS:", getattr(sys, "_MEIPASS", "NOT SET"))
-        print("ICON:", resource_path("assets/PassCore.png"))
-        print("EXISTS:", os.path.exists(resource_path("assets/PassCore.png")))
         self.setWindowTitle("PassCore vault")
         self.setWindowIcon(
             QIcon(resource_path("assets/PassCore.png"))
@@ -1534,10 +1531,6 @@ class PassCoreUI(QMainWindow):
             if not success:
                 error = ctypes.windll.kernel32.GetLastError()
                 print(f"[PassCore] SetWindowDisplayAffinity failed (Error {error})")
-                print("HWND:", hwnd)
-                print("Affinity:", hex(affinity))
-                print("Success:", success)
-                print("LastError:", error)
 
         except Exception as e:
             print(f"[PassCore] Capture protection error: {e}")
