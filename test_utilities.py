@@ -1,11 +1,11 @@
 print("\n=== Testing Python utility ===")
-from health import vault_health, images_health
+from passcore_util import PassCoreUtility
 
 print("\n=== PYTHON VAULT: ===")
-print(vault_health())
+print(PassCoreUtility.vault_health())
 
 print("\n=== PYTHON IMAGES: ===")
-print(images_health())
+print(PassCoreUtility.images_health())
 
 print("\n\n=== Testing C# utility ===")
 
