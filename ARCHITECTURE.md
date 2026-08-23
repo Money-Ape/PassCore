@@ -466,7 +466,7 @@ Backups contain:
 * vault.salt
 * notes_index.json
 * images_index.json
-* settings.json
+* settings.yaml
 * encrypted blob containers
 
 Workflow:
@@ -506,7 +506,7 @@ PassCore includes a runtime theme engine.
 Theme settings are stored in:
 
 ```text
-settings.json
+settings.yaml
 ```
 
 Workflow:
