@@ -4,6 +4,8 @@
 
 PassCore provides a desktop interface built with PySide6 integrating vault management, diagnostics, backups, import/export tools, password generation, search, and theme management.
 
+The menu bar's top-right corner also carries a "☰" toggle button that opens/closes a slide-out sidebar menu alongside the standard File/Edit/View/Tools menus.
+
 ---
 
 # File Menu
@@ -26,9 +28,9 @@ Vault Editor
 
 ---
 
-## Import PassCore Vault (.pcv)
+## Import Vault
 
-Imports a previously exported PassCore vault.
+Imports a previously exported PassCore vault (`.pcv`).
 
 Workflow:
 
@@ -48,77 +50,15 @@ Unlock Vault
 
 ---
 
-## Export PassCore Vault (.pcv)
+## Export Vault
 
-Creates a portable encrypted PassCore vault archive.
+Creates a portable encrypted PassCore vault archive (`.pcv`).
 
 Archive Contents:
 
 * vault.salt
 * notes_index.json
 * encrypted containers
-
----
-
-## Settings
-
-```text
-Settings
-├── Auto Lock
-└── Themes
-```
-
----
-
-### Auto Lock
-
-Configure automatic vault locking after inactivity.
-
-Available:
-
-* 1 minute
-* 5 minutes
-* 10 minutes
-* 30 minutes
-* 60 minutes
-
----
-
-### Themes
-
-PassCore includes 13 built-in themes.
-
-Available Themes:
-
-* Default
-* Slate Grey
-* Pale Green
-* Beige
-* Mint Green
-* Sage Green
-* Light Blue
-* Blue Grey
-* Ivory
-* Cream Dark Grey
-* Sage Dark Grey
-* Blue Grey Black
-* Charcoal
-
-Theme changes apply instantly.
-
-Workflow:
-
-```text
-Open Theme Dialog
-      ↓
-Select Theme
-      ↓
-Apply Theme
-      ↓
-refresh_theme()
-      ↓
-Updated Interface
-```
 
 ---
 
@@ -148,7 +88,141 @@ Navigate Results
 
 ---
 
+## Settings
+
+```text
+Edit
+└── Settings
+    ├── Auto-Lock Timer
+    ├── Theme
+    └── Hide from Screen Capture/Recording (Windows only)
+```
+
+---
+
+### Auto-Lock Timer
+
+Configure automatic vault locking after inactivity.
+
+Available:
+
+* 1 minute
+* 5 minutes
+* 10 minutes
+* 30 minutes
+* 60 minutes
+
+---
+
+### Theme
+
+PassCore includes 16 built-in themes.
+
+Available Themes:
+
+* Default
+* Cozy Pink
+* Soft Blossom
+* Catppuccin
+* Slate Grey
+* Forest
+* Beige
+* Mint Green
+* Sage Green
+* Tokyo Night
+* Nord
+* Ivory
+* Cream Dark Grey
+* Sage Dark Grey
+* Blue Grey Black
+* Charcoal
+
+Theme changes apply instantly.
+
+Workflow:
+
+```text
+Open Theme Dialog
+      ↓
+Select Theme
+      ↓
+Apply Theme
+      ↓
+refresh_theme()
+      ↓
+Updated Interface
+```
+
+---
+
+### Hide from Screen Capture/Recording (Windows only)
+
+A checkable toggle that prevents the PassCore window from appearing in screen captures or recordings.
+
+* Windows-only — the action is disabled (greyed out) on non-Windows platforms.
+* Reflects and updates the `hide_from_capture` setting.
+* Toggling it applies/removes capture protection immediately for the current session.
+
+---
+
+# View Menu
+
+## Open Backup Folder
+
+Opens the platform's local backup directory in the system file browser, for direct access to stored backup archives.
+
+Access:
+
+```text
+View
+└── Open Backup Folder
+```
+
+---
+
 # Tools Menu
+
+## Create Backup
+
+Manually triggers an on-demand vault backup, independent of the automatic backup created after autosave.
+
+Access:
+
+```text
+Tools
+└── Create Backup
+```
+
+---
+
+## Restore Backup
+
+Restores the vault from a previously created backup archive.
+
+Workflow:
+
+```text
+Select Backup
+      ↓
+Extract Archive
+      ↓
+Restore Metadata
+      ↓
+Restore Containers
+      ↓
+Integrity Verification
+      ↓
+Vault Unlock
+```
+
+Access:
+
+```text
+Tools
+└── Restore Backup
+```
+
+---
 
 ## Password Generator
 
@@ -292,13 +366,17 @@ Hide Welcome Screen
 * Password Generator
 * Vault Health Diagnostics
 * Theme Manager
-* Backup Management
+* Manual & Automatic Backup Creation
+* Backup Restoration
+* Open Backup Folder
+* Screen Capture Protection (Windows only)
 * Import TXT
-* Import PCV
-* Export PCV
+* Import Vault
+* Export Vault
 * Settings System
 * Welcome Screen
 * Live Theme Switching
+* Slide-out Menu (☰)
 
 ---
 
