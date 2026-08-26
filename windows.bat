@@ -34,7 +34,7 @@ if not exist "%UTIL_BIN%" (
         echo Install the .NET SDK to enable backups, vault import/export, and health checks.
     ) else (
         echo PassCore.Utilities not found for %RID%, building...
-        dotnet publish "%UTIL_DIR%" -c Release -r %RID% --self-contained -o "%UTIL_DIR%\publish\%RID%"
+        dotnet publish "%UTIL_DIR%" -c Release -r %RID% --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:OutputType=WinExe -o "%UTIL_DIR%\publish\%RID%"
         if errorlevel 1 (
             echo Warning: Failed to build PassCore.Utilities.
             echo Backups, vault import/export, and health checks will be unavailable.
