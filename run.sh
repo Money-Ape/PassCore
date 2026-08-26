@@ -60,7 +60,7 @@ if [ -n "$RID" ]; then
     if [ ! -f "$UTIL_BIN" ]; then
         if command -v dotnet >/dev/null 2>&1; then
             echo "PassCore.Utilities not found for $RID, building..."
-            dotnet publish "$UTIL_DIR" -c Release -r "$RID" --self-contained -o "$UTIL_DIR/publish/$RID" || {
+            dotnet publish "$UTIL_DIR" -c Release -r "$RID" --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o "$UTIL_DIR/publish/$RID" || {
                 echo "Warning: Failed to build PassCore.Utilities."
                 echo "Backups, vault import/export, and health checks will be unavailable."
             }
