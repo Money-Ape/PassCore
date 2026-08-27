@@ -217,6 +217,129 @@ def encrypt_image(image_path, image_info, image_bytes, album_name, vault_key):
 
             split_image_bin(image_info, album_name, encrypted_data, chunk_size=1024)
 
+def import_image_bytes(filename, image_bytes, album_name, vault_key):   # Import one image directly from memory.
+    filename = Path(filename).name
+    image_path = Path(filename)
+
+    if not image_bytes:
+        raise ValueError("Image payload is empty.")
+
+    if vault_key is None:
+        raise ValueError("Vault is locked.")
+
+    with Image.open(BytesIO(image_bytes)) as PCi:
+        PCi.load()
+
+        mime = mimetypes.guess_type(filename)[0]
+
+        image_info = {
+            "image_id": uuid.uuid4().hex[:32],
+            "image_path": image_path,
+            "image_bytes": image_bytes,
+            "mime": mime,
+            "width": PCi.width,
+            "height": PCi.height,
+            "mode": PCi.mode,
+            "format": PCi.format,
+            "sha256": "",
+        }
+
+    enc_cipher = AESGCM(vault_key)
+
+    nonce = os.urandom(12)
+    encrypted_enc_data = enc_cipher.encrypt(
+        nonce,
+        image_bytes,
+        None
+    )
+
+    record_enc_data = nonce + encrypted_enc_data
+
+    encrypted_data = (
+        struct.pack(">I", len(record_enc_data))
+        + record_enc_data
+    )
+
+    timestamp = datetime.now().strftime(
+        "%d-%m-%Y %I:%M:%S %p"
+    )
+
+    if not IMAGES_META.exists():
+        data = {"albums": {}}
+    else:
+        with open(IMAGES_META, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+    albums = data.setdefault("albums", {})
+
+    if album_name not in albums:
+        album_id = uuid.uuid4().hex[:32]
+        albums[album_name] = {album_id: {}}
+
+    album_id = next(iter(albums[album_name]))
+    album = albums[album_name][album_id]
+
+    old_entry = album.get(filename)
+
+    encrypted_sha = hashlib.sha256(
+        encrypted_data
+    ).hexdigest()
+
+    # Do not duplicate an identical image.
+    if old_entry and old_entry.get("sha256") == encrypted_sha:
+        return False
+
+    old_container = None
+
+    if old_entry:
+        old_uuid = old_entry.get("uuid")
+        if old_uuid:
+            old_container = (
+                CONTAINER_DIR
+                / album_id
+                / old_uuid
+            )
+
+    image_id = image_info["image_id"]
+
+    album[filename] = {
+        "uuid": image_id,
+        "mime": mime,
+        "extension": image_path.suffix,
+        "width": image_info["width"],
+        "height": image_info["height"],
+        "size": len(image_bytes),
+        "sha256": encrypted_sha,
+        "created_at": (
+            old_entry.get("created_at", timestamp)
+            if old_entry
+            else timestamp
+        ),
+        "modified": timestamp,
+    }
+
+    with open(IMAGES_META, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
+    # split_image_bin() resolves the album ID from IMAGES_META.
+    split_image_bin(
+        image_info,
+        album_name,
+        encrypted_data,
+        chunk_size=1024
+    )
+
+    # Delete the old physical container only after the new
+    # encrypted container has been successfully written.
+    if old_container and old_container.exists():
+        secure_del_tree(old_container)
+
+    cache_key = f"{album_name}/{filename}"
+    preview_cache.pop(cache_key, None)
+    merge_cache.pop(cache_key, None)
+
+    return True
+
 def decrypt_image(vault_key, encrypted_blobs):
     enc_cipher = AESGCM(vault_key)
     try:
