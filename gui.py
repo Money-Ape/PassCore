@@ -13,6 +13,7 @@ from pcvmenu.imageworker import ImageLoader
 from flowlayout import FlowLayout
 from collections import defaultdict
 from passcore_util import PassCoreUtility
+from pcvmenu.import_export import ImportExportWizard
 
 def resource_path(relative_path):
     try:
@@ -638,6 +639,7 @@ class PassCoreUI(QMainWindow):
 
         # Menu Bar
         menu = self.menuBar()
+
         self.menu_btn = QToolButton(self)
         self.menu_btn.setText("\u2630")
         self.menu_btn.setAutoRaise(True)
@@ -647,17 +649,10 @@ class PassCoreUI(QMainWindow):
         self.menu_btn.clicked.connect(self.toggle_slide_menu)
 
         file_menu = menu.addMenu("File") # File Menu
-        import_action = QAction("Import text", self) # File menu : Import text files
-        import_action.triggered.connect(lambda: import_txt(self))
-        file_menu.addAction(import_action)
 
-        import_vault_action = QAction("Import Vault", self) # Import Vault
-        import_vault_action.triggered.connect(self.import_vault_handler)
-        file_menu.addAction(import_vault_action)
-
-        export_action = QAction("Export Vault", self) # File menu : Export PassCore Vault
-        export_action.triggered.connect(self.export_vault_handler)
-        file_menu.addAction(export_action)
+        import_export_action = QAction("Import / Export", self) # File menu : Import text files
+        import_export_action.triggered.connect(self.open_import_export)
+        file_menu.addAction(import_export_action)
 
         edit_menu = menu.addMenu("Edit") # Edit Menu
 
@@ -667,6 +662,7 @@ class PassCoreUI(QMainWindow):
         edit_menu.addAction(search_action)
 
         settings_menu = edit_menu.addMenu("Settings") # File menu : Settings menu
+
         autolock_action = QAction("Auto-Lock Timer", self)
         autolock_action.triggered.connect(self.change_autolock_timer)
         settings_menu.addAction(autolock_action)
@@ -2071,6 +2067,14 @@ class PassCoreUI(QMainWindow):
         self.match_label.setText(
             f"{self.current_match + 1}/{len(self.matches)}"
         )
+
+    def open_import_export(self):
+        if self.key is None:
+            QMessageBox.information(self, "PassCore","Unlock the vault before using Import / Export.")
+            return
+
+        dialog = ImportExportWizard(self)
+        dialog.exec()
 
     def import_vault_handler(self):
         filepath,_ = QFileDialog.getOpenFileName(self, "Import PassCore Vault",
