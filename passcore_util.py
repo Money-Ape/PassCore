@@ -23,7 +23,7 @@ def get_utility_path():
             target = "win-x64"
             executable = "PassCore.Utilities.exe"
 
-        elif machine in "arm64":
+        elif machine in ("arm64"):
             target == "win-arm64"
             executable = "PassCore.Utilities.exe"
 
