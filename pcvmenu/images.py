@@ -7,6 +7,7 @@ from datetime import datetime
 from io import BytesIO
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
+from file import secure_del_tree
 
 preview_cache = {}
 merge_cache = {}
@@ -44,33 +45,6 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
-
-def secure_del_file(path):
-    if not path.exists():
-        return
-
-    size = path.stat().st_size
-    with open(path, "rb+") as file:
-        file.write(os.urandom(size))
-        file.flush()
-        os.fsync(file.fileno())
-    
-    path.unlink()
-
-def secure_del_tree(dir):
-    dir = Path(dir)
-    if not dir.exists():
-        return
-    
-    files = sorted(dir.rglob("*"), reverse=True)
-    for item in files:
-        if item.is_file():
-            secure_del_file(item)
-        
-        elif item.is_dir():
-            item.rmdir()
-        
-    dir.rmdir()
 
 def sha256_blob(shafile_path):
     hh = hashlib.sha256() # hash helper to cross check modifixation of any blobs
