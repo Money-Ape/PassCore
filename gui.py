@@ -5,10 +5,10 @@ from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEd
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent, QColor, QTextCharFormat
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal, QThread, QMetaObject, QObject, Q_ARG
 from passgen import generate_password
-from file import import_txt, META_FILE, secure_del_tree
+from file import import_txt, META_FILE, secure_del_tree, CONTAINER_DIR as NOTES_CONTAINER_DIR
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
-from pcvmenu.images import import_image, load_preview, IMAGES_META, CONTAINER_DIR
+from pcvmenu.images import import_image, load_preview, IMAGES_META, CONTAINER_DIR as IMAGES_CONTAINER_DIR
 from pcvmenu.imageworker import ImageLoader
 from flowlayout import FlowLayout
 from collections import defaultdict
@@ -1275,6 +1275,7 @@ class PassCoreUI(QMainWindow):
 
         if new_name in data["albums"]:
             QMessageBox.information(self, "PassCore", "Album already exists.!")
+            return
 
         data["albums"][new_name] = data["albums"].pop(old_name)
         with open(IMAGES_META, "w") as r_album:
@@ -1284,31 +1285,35 @@ class PassCoreUI(QMainWindow):
         self.update_album_size(new_name)
 
     def delete_album(self, album):
-        reply=QMessageBox.question(
-            self,
-            "Delete Album",
-            f"Delete '{album}'?"
-        )
+        reply=QMessageBox.question(self, "Delete Album", f"Delete '{album}'?")
         if reply!=QMessageBox.Yes:
             return
 
-        with open(IMAGES_META,"r") as f:
-            data=json.load(f)
-        album_id = next(iter(data["albums"][album]))
-        
-        not_empty = data["albums"][album][album_id]
-        if not_empty:
-            QMessageBox.information(self, "PassCore Album", "Album has images.\ncannot be delete.!")
-            return
+        try:
+            with open(IMAGES_META,"r") as f:
+                data=json.load(f)
 
-        del data["albums"][album][album_id]
-        with open(IMAGES_META,"w") as f:
-            json.dump(data,f,indent=4)
+            album_id = next(iter(data["albums"][album]))        
+            not_empty = data["albums"][album][album_id]
+            if not_empty:
+                QMessageBox.information(self, "PassCore Album", "Album has images.\ncannot be delete.!")
+                return
 
-        self.load_albums()
-        self.clear_gallery()
-        if self.note_list.count():
-            self.note_list.setCurrentRow(0)
+            del data["albums"][album][album_id]
+            with open(IMAGES_META, "w") as f:
+                json.dump(data, f, indent=4)
+
+            container_path = Path(IMAGES_CONTAINER_DIR) / album_id
+            if container_path.exists():
+                secure_del_tree(container_path)
+
+            self.load_albums()
+            self.clear_gallery()
+            if self.note_list.count():
+                self.note_list.setCurrentRow(0)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Delete Album Failed", str(e))
 
     def rename_image(self, album_name, filename):
         new_name, ok = QInputDialog.getText(
@@ -1366,24 +1371,54 @@ class PassCoreUI(QMainWindow):
         self.utility.mark_vault_changed()
 
     def delete_image(self, album_name, filename):
-        with open(IMAGES_META, "r") as del_img:
-            selc_image = json.load(del_img)
-        album_id = next(iter(selc_image["albums"][album_name]))
-        ctn_id = selc_image["albums"][album_name][album_id][filename]
-        ctn_path = Path(CONTAINER_DIR / album_id / ctn_id["uuid"])
-        
-        secure_del_tree(ctn_path)
-        
-        del selc_image["albums"][album_name][album_id][filename]
-        with open(IMAGES_META, "w") as del_img:
-            json.dump(selc_image, del_img, indent=4)
+        try:
+            with open(IMAGES_META, "r", encoding="utf-8") as f:
+                data = json.load(f)
 
-        current = self.note_list.currentItem()
-        if current:
-            self.load_album(current)
-        
-        self.update_album_size(album_name)
-        self.utility.mark_vault_changed()
+            albums = data.get("albums", {})
+            if album_name not in albums:
+                raise KeyError(f"Album not found: {album_name}")
+
+            album_data = albums[album_name]
+            if not album_data:
+                raise ValueError(f"Album '{album_name}' contains no metadata.")
+
+            album_id = next(iter(album_data))
+            album = album_data[album_id]
+            if filename not in album:
+                raise KeyError(f"Image not found: {filename}")
+
+            image_info = album[filename]
+            image_uuid = image_info.get("uuid")
+            if not image_uuid:
+                raise ValueError(f"Image UUID is missing for: {filename}")
+
+            container_path = (Path(CONTAINER_DIR) / album_id / image_uuid)
+            reply = QMessageBox.question(self, "Delete Image", f"Delete '{filename}' permanently?\n\n The encrypted image container will be securely deleted.", QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+            if container_path.exists():
+                secure_del_tree(container_path)
+                if container_path.exists(): # Verify deletion
+                    raise OSError("Image container still exists after secure deletion:\n{container_path}")
+
+            del album[filename]
+
+            with open(IMAGES_META, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4)
+
+            current = self.note_list.currentItem()
+            if current:
+                self.load_album(current)
+
+            self.update_album_size(album_name) # Update album size
+            self.utility.mark_vault_changed() # Mark vault modified
+            QMessageBox.information(self, "PassCore", f"'{filename}' was securely deleted.")
+
+        except Exception as e:
+            QMessageBox.critical(self, f"Secure Delete Failed Unable to completely delete '{filename}'.\n\n{e}")
 
     def clear_gallery(self):
         while self.gallery_layout.count():
@@ -1671,29 +1706,55 @@ class PassCoreUI(QMainWindow):
             return
         
         if len(self.notes) <= 1:
+            QMessageBox.warning(self, "PassCore", "At least one note must remain.")
             return
 
-        title = self.notes[row]["title"]
+        title = self.notes[row]["title"].strip()
 
-        del self.notes[row]
-        self.note_list.takeItem(row)
-        
-        row = max(0, min(row, len(self.notes) - 1))
-        self.current_note = row
-        self.note_list.setCurrentRow(row)
-
-        with open(META_FILE, "r") as f:
+        with open(META_FILE, "r", encoding="utf-8") as f:
             meta = json.load(f)
 
-        note = meta["notes"][title]
-        note_id = next(iter(note))
+        note_meta = meta.get("notes", {}).get(title)
+        if not note_meta:
+            QMessageBox.warning(self, "PassCore", f"Metadata for '{title}' was not found.")
+            return
 
-        secure_del_tree(CONTAINER_DIR / note_id)
-        del meta["notes"][title]
-        with open(META_FILE, "w") as f:
-            json.dump(meta, f, indent=4)
+        note_id = next(iter(note_meta))
+        container_path = Path(CONTAINER_DIR) / note_id
 
-        self.utility.mark_vault_changed()
+        reply = QMessageBox.question(self, "Delete Note", f"Delete '{title} permanently?\n\nThe encrypted container will be securely deleted.", QMessageBox.Yes | QMessageBox.No)
+
+        if reply != QMessageBox.Yes:
+            return
+
+        try:
+            if container_path.exists():
+                secure_del_tree(container_path)
+
+                if container_path.exists():
+                    raise OSError(f"Note container still exists:\n{container_path}")
+
+            del meta["notes"][title]
+            with open(META_FILE, "w", encoding="utf-8") as f:
+                json.dump(meta, f, indent=4)
+
+            del self.notes[row]
+            self.note_list.takeItem(row)
+
+            if self.notes:
+                new_row = min(row, len(self.notes) - 1)
+                self.current_note = new_row
+                self.note_list.setCurrentRow(new_row)
+
+            else:
+                self.current_note = -1
+
+            self.utility.mark_vault_changed()
+
+            QMessageBox.information(self, "PassCore", f"'{title}' was securely deleted.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Secure Delete Failed.!", f"Unable to completely delete '{title}'.\n\n", f"{e}")
 
     def show_vault_health(self):
         dialog = VaultHealthDialog(self)
