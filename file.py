@@ -31,31 +31,55 @@ PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
 META_FILE = PASSCORE_DIR / "notes_index.json"
 
 def secure_del_file(path):
+    path = Path(path)
     if not path.exists():
-        return
+        return False
 
-    size = path.stat().st_size
-    with open(path, "rb+") as file:
-        file.write(os.urandom(size))
-        file.flush()
-        os.fsync(file.fileno())
-    
-    path.unlink()
+    if not path.is_file():
+        raise IsADirectoryError(f"Expected a file, got: {path}")
+
+    try:
+        size = path.stat().st_size
+        with open(path, "rb+", buffering=0) as file:
+            if size > 0:
+                file.write(os.urandom(size))
+                file.flush()
+                os.fsync(file.fileno())
+
+        path.unlink()
+
+        if path.exists():
+            raise OSError(f"File still exists after deletion: {path}")
+        return True
+
+    except Exception as e:
+        raise OSError(f"Secure file deletion failed: {path}\n{e}") from e
 
 def secure_del_tree(dir):
     dir = Path(dir)
     if not dir.exists():
-        return
-    
-    files = sorted(dir.rglob("*"), reverse=True)
-    for item in files:
-        if item.is_file():
-            secure_del_file(item)
-        
-        elif item.is_dir():
-            item.rmdir()
-        
-    dir.rmdir()
+        return False
+
+    if not dir.is_dir():
+        raise NotADirectoryError(f"Expected directory, got: {dir}")
+
+    try:
+        files = sorted(dir.rglob("*"), reverse=True)
+        for item in files:
+            if item.is_file():
+                secure_del_file(item)
+            
+            elif item.is_dir():
+                item.rmdir()
+            
+        dir.rmdir()
+
+        if dir.exists():
+            raise OSError(f"Container still exists after deletion: {dir}")
+        return True
+
+    except Exception as e:
+        raise OSError(f"Secure container deletion failed:\n{dir}\n\n{e}") from e
 
 def import_txt(window):
         if window.key is None:
