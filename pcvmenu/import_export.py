@@ -1,4 +1,5 @@
 import io, json, os, struct, zipfile
+from datetime import datetime
 from pathlib import Path
 from argon2.low_level import hash_secret_raw, Type
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -429,16 +430,15 @@ class ImportExportWizard(QDialog):
             "title": title,
             "content": imported,
         })
-
-        self.parent_window.load_notes(
-            self.parent_window.notes
-        )
+        self.parent_window.load_notes(self.parent_window.notes)
 
         if hasattr(self.parent_window, "utility"):
             self.parent_window.utility.mark_vault_changed()
 
         self.parent_window.save_btn.click() # The real save slot is connected by enc.py.
+
         QMessageBox.information(self, "PassCore", f"'{title}' imported successfully.")
+        self.parent_window.save_btn.click()
         self.accept()
 
     def _import_package(self):
@@ -518,15 +518,15 @@ class ImportExportWizard(QDialog):
             )
 
         self.parent_window.notes.extend(imported)
-        self.parent_window.load_notes(
-            self.parent_window.notes
-        )
+        self.parent_window.load_notes(self.parent_window.notes)
 
         if hasattr(self.parent_window, "utility"):
             self.parent_window.utility.mark_vault_changed()
 
         self.parent_window.save_btn.click() # enc.py owns the actual encryption/save pipeline.
+
         QMessageBox.information(self, "PassCore", f"Imported {len(imported)} note(s) successfully.")
+        self.parent_window.save_btn.click()
         self.accept()
 
     def _import_images_package(self, manifest, files):
@@ -655,6 +655,7 @@ class ImportExportWizard(QDialog):
             "format": "PassCore Object Package",
             "version": 1,
             "type": "credentials",
+            "created": datetime.now().strftime("%d-%m-%Y %I:%M:%S %p"),
             "items": [],
         }
 
@@ -672,6 +673,7 @@ class ImportExportWizard(QDialog):
                 "content": str(
                     note.get("content") or ""
                 ),
+                "exported_at": datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
             }
 
             filename = f"notes/{output_index:04d}.json"
@@ -702,6 +704,7 @@ class ImportExportWizard(QDialog):
             "format": "PassCore Object Package",
             "version": 1,
             "type": "images",
+            "created": datetime.now().strftime("%d-%m-%Y %I:%M:%S %p"),
             "albums": [],
         }
         for album_name in selected:
@@ -714,6 +717,7 @@ class ImportExportWizard(QDialog):
             album_data = albums[album_name][album_id]
             album_entry = {
                 "name": album_name,
+                "exported_at": datetime.now().strftime("%d-%m-%Y %I:%M:%S %p"),
                 "images": [],
             }
             for image_index, (filename, info, ) in enumerate(album_data.items()):
@@ -734,10 +738,10 @@ class ImportExportWizard(QDialog):
                 album_entry["images"].append({
                     "filename": safe_name,
                     "file": payload_name,
-                    "extension": info.get(
-                        "extension",
-                        Path(filename).suffix,
-                    ),
+                    "extension": info.get("extension", Path(filename).suffix),
+                    "width": info.get("width"),
+                    "height": info.get("height"),
+                    "mime": info.get("mime")
                 })
 
             manifest["albums"].append(
