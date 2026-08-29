@@ -459,6 +459,14 @@ The cache avoids repeated blob reconstruction and decryption while browsing albu
 
 ---
 
+# PCV Export / Import
+
+The `.pcv` format is a **full-vault** archive produced by the C# Utility Bridge (`VaultFileService`), covering `vault.salt`, `notes_index.json`, `images_index.json`, `settings.yaml`, and every encrypted blob container — the same contents as a backup. It is intended for moving or restoring an entire vault wholesale.
+
+This is distinct from the **`.pcx` PassCore Package** format used by the File → Import / Export dialog (see [MENUSYSTEM.md](MENUSYSTEM.md#file-menu)), which is built and encrypted entirely in the Python layer (Argon2id + AES-GCM, no C# bridge involved) and carries a hand-picked subset of credentials or image albums rather than the whole vault.
+
+---
+
 # Backup Architecture
 
 Backups contain:
