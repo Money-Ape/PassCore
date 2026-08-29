@@ -10,55 +10,90 @@ The menu bar's top-right corner also carries a "☰" toggle button that opens/cl
 
 # File Menu
 
-## Import Text File
+## Import / Export
 
-Allows importing plaintext records into the current vault.
+Opens the **Import / Export** dialog — a single tabbed window (Import / Export) covering both Credentials and Images. The vault must be unlocked; selecting this item while locked shows a prompt instead of opening the dialog.
 
-Workflow:
+This dialog operates on portable **PassCore Package** files (`.pcx`), which are separate from the full-vault `.pcv` backup format described in [ARCHITECTURE.md](ARCHITECTURE.md#pcv-export--import). A `.pcx` package holds a hand-picked set of credentials or image albums — not the whole vault — and is protected by its own package password (independent of the vault's master password), derived with Argon2id and sealed with AES-GCM.
+
+### Import Tab
+
+**Import as:** `Credentials` or `Images`. The available source options change based on this selection:
+
+| Import as | Available Sources |
+|---|---|
+| Credentials | Import Text (`.txt`), Import PassCore Package (`.pcx`) |
+| Images | Import PassCore Package (`.pcx`) |
+
+Every package is type-checked before anything is written: a package's embedded manifest type must match the currently selected "Import as" type, or the import is rejected outright (a Credentials package cannot be dropped into Images, and vice versa).
+
+**Import Text** workflow:
 
 ```text
-Import TXT
+Select .txt File
       ↓
-Replace Existing Notes
+Read File
+      ↓
+Validate / Convert (secure YAML check)
+      ↓
+Append as New Note
+      ↓
+Save Vault
+```
+
+**Import PassCore Package** workflow:
+
+```text
+Select .pcx File
+      ↓
+Enter Package Password
+      ↓
+Decrypt Package (Argon2id + AES-GCM)
+      ↓
+Verify Manifest Type Matches Selection
+      ↓
+Extract Items
+      ↓
+Credentials → Append Notes (auto-renamed on title collision)
       OR
-Append Notes
+Images → Import Albums / Images
       ↓
-Vault Editor
+Save Vault / Refresh Gallery
 ```
 
 ---
 
-## Import Vault
+### Export Tab
 
-Imports a previously exported PassCore vault (`.pcv`).
+**Export:** `Credentials` or `Images`. The list below shows every note (Credentials) or every album (Images) currently in the vault, each with its own checkbox, alongside **Select All** / **Clear All** buttons and a live "N selected" counter.
 
-Workflow:
+Exporting requires choosing a package password, which is used to encrypt the resulting `.pcx` file — this password is separate from, and does not need to match, the vault's master password.
+
+**Export Selected** workflow:
 
 ```text
-Select Vault
+Select Credentials or Images
       ↓
-Extract Archive
+Check Items to Export
       ↓
-Restore Metadata
+Choose Package Password
       ↓
-Restore Containers
+Decrypt Selected Items In-Memory
       ↓
-Lock Imported Vault
+Build Manifest + Payload Files
       ↓
-Unlock Vault
+Compress to Inner Archive
+      ↓
+Encrypt (Argon2id + AES-GCM)
+      ↓
+Save .pcx File
 ```
 
----
+`.pcx` Package Contents (inside the encrypted, zipped archive):
 
-## Export Vault
-
-Creates a portable encrypted PassCore vault archive (`.pcv`).
-
-Archive Contents:
-
-* vault.salt
-* notes_index.json
-* encrypted containers
+* `manifest.json` — package type (`credentials` or `images`), creation timestamp, and an index of included items
+* Credentials: one JSON file per note (`notes/0000.json`, `notes/0001.json`, …) containing title, content, and export timestamp
+* Images: one file per image, grouped by album (`images/0000/0000_photo.png`, …), plus per-image metadata (filename, extension, dimensions, MIME type) in the manifest
 
 ---
 
@@ -370,9 +405,7 @@ Hide Welcome Screen
 * Backup Restoration
 * Open Backup Folder
 * Screen Capture Protection (Windows only)
-* Import TXT
-* Import Vault
-* Export Vault
+* Import / Export Dialog (Text, PassCore Package `.pcx` — Credentials & Images)
 * Settings System
 * Welcome Screen
 * Live Theme Switching
