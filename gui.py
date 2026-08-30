@@ -5,7 +5,7 @@ from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEd
 from PySide6.QtGui import QAction, QIcon, QTextCursor, QPixmap, QShowEvent, QColor, QTextCharFormat
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QPoint, QSize, Signal, QThread, QMetaObject, QObject, Q_ARG
 from passgen import generate_password
-from file import import_txt, META_FILE, secure_del_tree, CONTAINER_DIR as NOTES_CONTAINER_DIR
+from file import import_txt, META_FILE, secure_del_tree, NOTES_CONTAINER_DIR
 from settings import load_settings, save_settings
 from theme import THEMES, BUTTONS
 from pcvmenu.images import import_image, load_preview, IMAGES_META, CONTAINER_DIR as IMAGES_CONTAINER_DIR
@@ -1349,7 +1349,7 @@ class PassCoreUI(QMainWindow):
             json.dump(r_name, modi_image, indent=4)
 
         # Modifies container metadata
-        container_meta = Path(CONTAINER_DIR / image_info["uuid"] / "metadata.json")
+        container_meta = Path(IMAGES_CONTAINER_DIR / image_info["uuid"] / "metadata.json")
         if container_meta.exists():
             with open(container_meta, "r") as ctn_data:
                 ctn_meta = json.load(ctn_data)
@@ -1393,7 +1393,7 @@ class PassCoreUI(QMainWindow):
             if not image_uuid:
                 raise ValueError(f"Image UUID is missing for: {filename}")
 
-            container_path = (Path(CONTAINER_DIR) / album_id / image_uuid)
+            container_path = (Path(IMAGES_CONTAINER_DIR) / album_id / image_uuid)
             reply = QMessageBox.question(self, "Delete Image", f"Delete '{filename}' permanently?\n\n The encrypted image container will be securely deleted.", QMessageBox.Yes | QMessageBox.No
             )
             if reply != QMessageBox.Yes:
@@ -1418,7 +1418,7 @@ class PassCoreUI(QMainWindow):
             QMessageBox.information(self, "PassCore", f"'{filename}' was securely deleted.")
 
         except Exception as e:
-            QMessageBox.critical(self, f"Secure Delete Failed Unable to completely delete '{filename}'.\n\n{e}")
+            QMessageBox.critical(self, "Secure Delete Failed", f"Unable to completely delete '{filename}'.\n\n{e}")
 
     def clear_gallery(self):
         while self.gallery_layout.count():
@@ -1709,18 +1709,30 @@ class PassCoreUI(QMainWindow):
             QMessageBox.warning(self, "PassCore", "At least one note must remain.")
             return
 
-        title = self.notes[row]["title"].strip()
+        note = self.notes[row]
+        title = note["title"].strip()
+        note_id = note.get("id")
 
         with open(META_FILE, "r", encoding="utf-8") as f:
             meta = json.load(f)
 
-        note_meta = meta.get("notes", {}).get(title)
-        if not note_meta:
+        meta_title = None
+        if note_id:
+            for t, entry in meta.get("notes", {}).items():
+                if note_id in entry:
+                    meta_title = t
+                    break
+        else:
+            note_meta = meta.get("notes", {}).get(title)
+            if note_meta:
+                note_id = next(iter(note_meta))
+                meta_title = title
+
+        if not note_id:
             QMessageBox.warning(self, "PassCore", f"Metadata for '{title}' was not found.")
             return
 
-        note_id = next(iter(note_meta))
-        container_path = Path(CONTAINER_DIR) / note_id
+        container_path = Path(NOTES_CONTAINER_DIR) / note_id
 
         reply = QMessageBox.question(self, "Delete Note", f"Delete '{title} permanently?\n\nThe encrypted container will be securely deleted.", QMessageBox.Yes | QMessageBox.No)
 
@@ -1734,9 +1746,10 @@ class PassCoreUI(QMainWindow):
                 if container_path.exists():
                     raise OSError(f"Note container still exists:\n{container_path}")
 
-            del meta["notes"][title]
-            with open(META_FILE, "w", encoding="utf-8") as f:
-                json.dump(meta, f, indent=4)
+            if meta_title and meta_title in meta.get("notes", {}):
+                del meta["notes"][meta_title]
+                with open(META_FILE, "w", encoding="utf-8") as f:
+                    json.dump(meta, f, indent=4)
 
             del self.notes[row]
             self.note_list.takeItem(row)
@@ -1754,7 +1767,7 @@ class PassCoreUI(QMainWindow):
             QMessageBox.information(self, "PassCore", f"'{title}' was securely deleted.")
 
         except Exception as e:
-            QMessageBox.critical(self, "Secure Delete Failed.!", f"Unable to completely delete '{title}'.\n\n", f"{e}")
+            QMessageBox.critical(self, "Secure Delete Failed.!", f"Unable to completely delete '{title}'.\n\n{e}")
 
     def show_vault_health(self):
         dialog = VaultHealthDialog(self)
