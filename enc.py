@@ -205,7 +205,22 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
         print("TITLE:", repr(note["title"]))
         print("INDEX:", list(index["notes"].keys()))
         title = note["title"].strip()
-        if title not in index["notes"]:
+
+        note_id = note.get("id")
+        prev_title = note.get("_saved_title", title)
+
+        if note_id and prev_title in index["notes"] and note_id in index["notes"][prev_title]:
+            if prev_title != title:
+                entry = index["notes"].pop(prev_title)
+                index["notes"][title] = entry
+                with open(META_FILE, "w") as f:
+                    json.dump(index, f, indent=4)
+                print(f"{YELLOW}RENAMED INDEX ENTRY: '{prev_title}' -> '{title}' (id kept: {note_id}){RESET}")
+
+        elif title in index["notes"]:
+            note_id = next(iter(index["notes"][title]))
+
+        else:
             note_id = uuid.uuid4().hex[:32]
             index["notes"][title] = {
                 note_id: {
@@ -216,9 +231,11 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
             with open(META_FILE, "w") as f:
                 json.dump(index, f, indent=4)
 
-        note_id = next(iter(index["notes"][title]))
+        note["id"] = note_id
+        note["_saved_title"] = title
 
-        payload = json.dumps(note, ensure_ascii=False).encode()
+        payload_out = {"title": note["title"], "content": note["content"]}
+        payload = json.dumps(payload_out, ensure_ascii=False).encode()
 
         encrypted_data = bytearray()
 
@@ -498,6 +515,8 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 return
             
             encrypted_blobs = []
+            blob_note_ids = []
+            blob_titles = []
             with open(META_FILE, "r") as enc_note:
                 meta = json.load(enc_note)
             
@@ -505,6 +524,8 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
                 note_id = next(iter(note))
                 merged = merge_blob_bin(note_id)
                 encrypted_blobs.append(merged)
+                blob_note_ids.append(note_id)
+                blob_titles.append(title)
 
         except FileNotFoundError:
             QMessageBox.information(
@@ -534,7 +555,11 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
         window.loader.vault_key = key
         try:
             vault_notes = decrypt_vault(key, encrypted_blobs)
-            
+            for i, n in enumerate(vault_notes):
+                if i < len(blob_note_ids):
+                    n["id"] = blob_note_ids[i]
+                    n["_saved_title"] = blob_titles[i]
+
             unlock_btn.hide()
             window.add_btn.setEnabled(True)
             window.note_title.setEnabled(True)
