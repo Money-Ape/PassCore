@@ -23,10 +23,15 @@ def get_container_dir():
     else:
         raise RuntimeError(f"Unsupported OS: {sys}")
 
+def get_notes_container_dir():
+    return get_container_dir() / "notes"
+
 CONTAINER_DIR = get_container_dir()
+NOTES_CONTAINER_DIR = get_notes_container_dir()
 PASSCORE_DIR = get_PassCore_dir()
 
 CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
+NOTES_CONTAINER_DIR.mkdir(parents=True, exist_ok=True)
 PASSCORE_DIR.mkdir(parents=True, exist_ok=True)
 META_FILE = PASSCORE_DIR / "notes_index.json"
 
