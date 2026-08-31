@@ -1164,11 +1164,32 @@ class PassCoreUI(QMainWindow):
         chosen = menu.exec(pos)
         if chosen == delete:
             if self.selected_images:
+                count = len(self.selected_images)
+                reply = QMessageBox.question(
+                    self, "Delete Images", f"Delete {count} selected image(s) permanently?\n\nTheir encrypted containers will be securely deleted.",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply != QMessageBox.Yes:
+                    return
+
+                succeeded = 0
+                failed = []
                 for album, image in list(self.selected_images):
-                    self.delete_image(album, image)
+                    if self.delete_image(album, image, confirm=False, notify=False):
+                        succeeded += 1
+                    else:
+                        failed.append(image)
 
                 self.selected_images.clear()
                 self.update_selection_label()
+
+                if failed:
+                    QMessageBox.warning(
+                        self, "PassCore",
+                        f"Deleted {succeeded} of {count} image(s).\n\nFailed: {', '.join(failed)}"
+                    )
+                else:
+                    QMessageBox.information(self, "PassCore", f"{succeeded} image(s) were securely deleted.")
 
             else:
                 reply = QMessageBox.question(
@@ -1177,7 +1198,7 @@ class PassCoreUI(QMainWindow):
                 if reply != QMessageBox.Yes:
                     return
 
-                self.delete_image(album_name, filename)
+                self.delete_image(album_name, filename, confirm=False)
         
         elif chosen == rename:
             self.rename_image(album_name, filename)
@@ -1191,7 +1212,7 @@ class PassCoreUI(QMainWindow):
             size_meta = json.load(s)
 
         album_size = size_meta["albums"].get(album_name)
-        if album_size is None:
+        if not album_size:
             self.size_label.setText("Size\n0 Bytes")
             return
 
@@ -1299,7 +1320,7 @@ class PassCoreUI(QMainWindow):
                 QMessageBox.information(self, "PassCore Album", "Album has images.\ncannot be delete.!")
                 return
 
-            del data["albums"][album][album_id]
+            del data["albums"][album]
             with open(IMAGES_META, "w") as f:
                 json.dump(data, f, indent=4)
 
@@ -1370,7 +1391,7 @@ class PassCoreUI(QMainWindow):
         )
         self.utility.mark_vault_changed()
 
-    def delete_image(self, album_name, filename):
+    def delete_image(self, album_name, filename, confirm=True, notify=True):
         try:
             with open(IMAGES_META, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -1394,10 +1415,12 @@ class PassCoreUI(QMainWindow):
                 raise ValueError(f"Image UUID is missing for: {filename}")
 
             container_path = (Path(IMAGES_CONTAINER_DIR) / album_id / image_uuid)
-            reply = QMessageBox.question(self, "Delete Image", f"Delete '{filename}' permanently?\n\n The encrypted image container will be securely deleted.", QMessageBox.Yes | QMessageBox.No
-            )
-            if reply != QMessageBox.Yes:
-                return
+
+            if confirm:
+                reply = QMessageBox.question(self, "Delete Image", f"Delete '{filename}' permanently?\n\n The encrypted image container will be securely deleted.", QMessageBox.Yes | QMessageBox.No
+                )
+                if reply != QMessageBox.Yes:
+                    return False
 
             if container_path.exists():
                 secure_del_tree(container_path)
@@ -1415,10 +1438,19 @@ class PassCoreUI(QMainWindow):
 
             self.update_album_size(album_name) # Update album size
             self.utility.mark_vault_changed() # Mark vault modified
-            QMessageBox.information(self, "PassCore", f"'{filename}' was securely deleted.")
+
+            if notify:
+                QMessageBox.information(self, "PassCore", f"'{filename}' was securely deleted.")
+
+            return True
 
         except Exception as e:
-            QMessageBox.critical(self, "Secure Delete Failed", f"Unable to completely delete '{filename}'.\n\n{e}")
+            if notify:
+                QMessageBox.critical(self, "Secure Delete Failed", f"Unable to completely delete '{filename}'.\n\n{e}")
+            else:
+                print(f"[PassCore] Failed to delete '{filename}': {e}")
+
+            return False
 
     def clear_gallery(self):
         while self.gallery_layout.count():
