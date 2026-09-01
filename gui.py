@@ -1813,6 +1813,11 @@ class PassCoreUI(QMainWindow):
             self.editor.insertPlainText(password)
 
     def start_backup(self, force=False):
+        if getattr(self, "_backup_running", False):
+            return
+
+        self._backup_running = True
+
         self.backup_started()
 
         self.backup_thread = QThread()
@@ -1833,6 +1838,11 @@ class PassCoreUI(QMainWindow):
         self.backup_thread.start()
 
     def start_restore(self, filepath):
+        if getattr(self, "_restore_running", False):
+            return
+
+        self._restore_running = True
+
         self.backup_started()
 
         self.restore_thread = QThread()
@@ -1853,6 +1863,10 @@ class PassCoreUI(QMainWindow):
         self.restore_thread.start()
 
     def start_import(self, filepath):
+        if getattr(self, "_import_running", False):
+            return
+        self._import_running = True
+
         self.import_started()
 
         self.import_thread = QThread()
@@ -1873,6 +1887,10 @@ class PassCoreUI(QMainWindow):
         self.import_thread.start()
 
     def start_export(self, filepath):
+        if getattr(self, "_export_running", False):
+            return
+        self._export_running = True
+
         self.export_started()
 
         self.export_thread = QThread()
@@ -1897,6 +1915,7 @@ class PassCoreUI(QMainWindow):
         self.start_backup(force=True)
 
     def on_backup_finished(self, success):
+        self._backup_running = False
         self.backup_progress.hide()
         if success:
             self.backup_finished()
@@ -1908,10 +1927,12 @@ class PassCoreUI(QMainWindow):
             )
 
     def on_backup_error(self, error):
+        self._backup_running = False
         self.backup_failed()
         QMessageBox.warning(self, "PassCore", f"Backup Failed\n\n{error}")
 
     def on_restore_finished(self, success):
+        self._restore_running = False
         if success:
             self.key = None
             self.editor.setPlainText(self.lock_screen)
@@ -1931,6 +1952,7 @@ class PassCoreUI(QMainWindow):
         self.update_vault_size()
 
     def on_restore_error(self, error):
+        self._restore_running = False
         self.backup_failed()
         QMessageBox.critical(self, "PassCore Restore", f"Restore Failed\n\n{error}")
         self.update_vault_size()
@@ -2200,6 +2222,7 @@ class PassCoreUI(QMainWindow):
         self.start_import(filepath)
 
     def on_import_finished(self, success):
+        self._import_running = False
         if not success:
             self.import_failed_label()
             QMessageBox.warning(self, "Import Failed", "Import failed.")
@@ -2226,6 +2249,7 @@ class PassCoreUI(QMainWindow):
         QMessageBox.information(self, "PassCore", "Import complete.\n\nUnlock the imported vault to continue.")
 
     def on_import_error(self, error):
+        self._import_running = False
         self.import_failed_label()
         QMessageBox.warning(self, "Import Failed", error)
 
@@ -2246,6 +2270,7 @@ class PassCoreUI(QMainWindow):
         self.start_export(file_path)
 
     def on_export_finished(self, result):
+        self._export_running = False
         self.export_finished_label()
         QMessageBox.information(self, "PassCore",
             f"Vault exported successfully.\n\n"
@@ -2253,6 +2278,7 @@ class PassCoreUI(QMainWindow):
         )
 
     def on_export_error(self, error):
+        self._export_running = False
         self.export_failed_label()
         QMessageBox.critical(self, "Export Failed", error)
 
