@@ -756,7 +756,7 @@ class ImportExportWizard(QDialog):
                 "images": [],
             }
             for image_index, (filename, info, ) in enumerate(album_data.items()):
-                encrypted = merge_image_bin(filename, album_name)
+                encrypted = merge_image_bin(self.parent_window.utility, album_name)
                 image_bytes = decrypt_image(self.parent_window.key, encrypted)
 
                 if isinstance(image_bytes, ValueError):
