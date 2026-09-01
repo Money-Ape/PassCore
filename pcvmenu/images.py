@@ -1,5 +1,5 @@
+import sys, os, platform, mimetypes, uuid, hashlib, json, struct, tempfile
 from PIL import Image
-import sys, os, platform, mimetypes, uuid, hashlib, json, struct
 from pathlib import Path
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtGui import QPixmap
@@ -8,6 +8,11 @@ from io import BytesIO
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
 from file import secure_del_tree
+
+GREEN = "\033[32m" # SUCCESS & NEW RECORDS
+YELLOW = "\033[33m" # FRESH Keys, INTEGERS & OLD RECORDS 
+BLUE = "\033[34m"
+RESET = "\033[0m"
 
 preview_cache = {}
 merge_cache = {}
@@ -37,6 +42,17 @@ def get_container_dir():
         raise RuntimeError(f"Unsupported OS: {sys}")
 
 CONTAINER_DIR = get_container_dir()
+
+def get_output_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path("/tmp")
+
+    elif sys == "Windows":
+        return Path(tempfile.gettempdir())
+
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
 
 def resource_path(relative_path):
     try:
@@ -331,59 +347,99 @@ def decrypt_image(vault_key, encrypted_blobs):
             decrypt_enc_data = enc_cipher.decrypt(nonce, cipher_text, None) # Extract decrypted nonce & cipher text from encryted blobs.
             return decrypt_enc_data
 
-    except InvalidTag:
-        return ValueError("Image authentication failed. Wrong key or corrupted image.")
+    except InvalidTag as e:
+        raise InvalidTag("Image authentication failed. Wrong key or corrupted image.") from e
 
-def merge_image_bin(filename, album_name):
+def merge_image_bin(utility, filename, album_name):
     cache_key = f"{album_name}/{filename}"
     if cache_key in merge_cache:
         return merge_cache[cache_key]
 
-    with open(IMAGES_META, "r") as ijson:
-        merge_i = json.load(ijson)
+    if not IMAGES_META.exists():
+        raise FileNotFoundError("images_index.json is missing.")
 
-    album_id = next(iter(merge_i["albums"][album_name]))
-    
-    image_ctn = merge_i["albums"][album_name][album_id][filename]["uuid"]
-    container_meta = CONTAINER_DIR / album_id / image_ctn / "metadata.json"
+    with open(IMAGES_META, "r", encoding="utf-8") as ijson:
+        data = json.load(ijson)
 
-    merge_data = bytearray()
-    with open(container_meta, "r") as read_meta:
-        merge_meta = json.load(read_meta)
+    albums = data.get("albums", {})
+    if album_name not in albums:
+        raise KeyError(f"Album not found: {album_name}")
 
-    for blob_name, blob_info in merge_meta["blobs"].items():
-        container_id = blob_info["container"]
-        blob_path = CONTAINER_DIR / album_id / image_ctn / container_id / blob_name
+    album_data = albums[album_name]
+    if not album_data:
+        raise ValueError(f"Album contains no metadata: {album_name}")
 
-        if not blob_path.exists():
-            raise FileNotFoundError(f"Missing blob: {blob_name}")
-        
-        with open(blob_path, "rb") as f:
-            merge_data.extend(f.read())
+    album_id = next(iter(album_data))
+    album = album_data[album_id]
+    if filename not in album:
+        raise KeyError(f"Image not found: {filename}")
 
-    merge_hash = hashlib.sha256(merge_data).hexdigest()
-    if merge_hash != merge_i["albums"][album_name][album_id][filename]["sha256"]:
-        raise FileNotFoundError(f"Merged image: {image_ctn}; failed integrity verification is corrupted.!")
+    image_info = album[filename]
+    image_uuid = image_info.get("uuid")
+    if not image_uuid:
+        raise ValueError(f"Image UUID is missing: {filename}")
 
-    image_bytes = bytes(merge_data)
-    merge_cache[cache_key] = image_bytes
-    if len(merge_cache) > MAX_CACHE:
-        old = next(iter(merge_cache))
-        del merge_cache[old]
+    image_container = (Path(CONTAINER_DIR) / album_id / image_uuid)
+    if not image_container.exists():
+        raise FileNotFoundError(f"Image container does not exist:\n{image_container}")
+
+    metadata_path = image_container / "metadata.json"
+    if not metadata_path.exists():
+        raise FileNotFoundError(f"Image container metadata is missing:\n{metadata_path}")
+
+    import tempfile
+    output_path = (get_output_dir() / f"passcore_image_merge_{uuid.uuid4().hex}.bin")
 
     try:
-        blob_integrity_verify(filename, album_name)
-    except (FileNotFoundError, ValueError) as e:
-        return InvalidTag(e)
+        print(f"{BLUE}C# IMAGE MERGE:{RESET}\n{image_uuid}")
 
-    return image_bytes
+        utility.merge_blob_bin(image_container, output_path)
 
-def load_preview(vault_key, filename, album_name):
+        if not output_path.exists():
+            raise FileNotFoundError("C# image merger did not create the output file.")
+
+        with open(output_path, "rb") as merged_file:
+            merged_data = merged_file.read()
+
+        if not merged_data:
+            raise ValueError(f"C# merger produced empty data for image: {filename}")
+
+        merge_hash = hashlib.sha256(merged_data).hexdigest()
+        expected_hash = image_info.get("sha256")
+        if expected_hash and merge_hash != expected_hash:
+            raise ValueError(f"Merged image integrity verification failed:\n"f"{filename}")
+
+        merge_cache[cache_key] = bytes(merged_data)
+        if len(merge_cache) > MAX_CACHE:
+            old = next(iter(merge_cache))
+            del merge_cache[old]
+
+        print(f"{GREEN}C# IMAGE MERGE COMPLETE:{RESET}\n{len(merged_data)} bytes")
+
+        try:
+            blob_integrity_verify(filename, album_name)
+
+        except (FileNotFoundError, ValueError) as e:
+            merge_cache.pop(cache_key, None)
+            raise InvalidTag(f"Image integrity verification failed: {e}")
+
+        return bytes(merged_data)
+
+    finally:
+        if output_path.exists():
+            try:
+                output_path.unlink()
+                print(f"{GREEN}IMAGE MERGE TEMP REMOVED:{RESET}\n{output_path}")
+
+            except OSError as e:
+                print(f"{YELLOW}WARNING:{RESET}\nUnable to remove temporary image merge file: {e}")
+
+def load_preview(utility, vault_key, filename, album_name):
     cache_key = f"{album_name}/{filename}"
     if cache_key in preview_cache:
         return preview_cache[cache_key]
 
-    encrypted_blobs = merge_image_bin(filename, album_name)
+    encrypted_blobs = merge_image_bin(utility, filename, album_name)
     image_bytes = decrypt_image(vault_key, encrypted_blobs)
     if image_bytes is None:
         return None
