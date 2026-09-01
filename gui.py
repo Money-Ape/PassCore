@@ -41,8 +41,6 @@ class PassCoreUI(QMainWindow):
         super().__init__()
         self.vault_key = vault_key
 
-        self.loader = ImageLoader(self.vault_key)
-
         self.setWindowTitle("PassCore vault")
         self.setWindowIcon(
             QIcon(resource_path("assets/PassCore.png"))
@@ -70,6 +68,8 @@ class PassCoreUI(QMainWindow):
 
         self.build_ui()
         self.utility = PassCoreUtility()
+
+        self.loader = ImageLoader(self.utility, self.vault_key)
 
         self.menu_option = False
         self.lock_screen = (
@@ -1033,7 +1033,7 @@ class PassCoreUI(QMainWindow):
 
         album_id = next(iter(data["albums"][album_name]))
 
-        pix = load_preview(self.vault_key, filename, album_name)
+        pix = load_preview(self.utility, self.vault_key, filename, album_name)
         self.image_preview.setPixmap(
             pix.scaled(
                 self.image_preview.size(),
@@ -1425,7 +1425,7 @@ class PassCoreUI(QMainWindow):
             if container_path.exists():
                 secure_del_tree(container_path)
                 if container_path.exists(): # Verify deletion
-                    raise OSError("Image container still exists after secure deletion:\n{container_path}")
+                    raise OSError(f"Image container still exists after secure deletion:\n{container_path}")
 
             del album[filename]
 
