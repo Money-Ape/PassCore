@@ -24,7 +24,7 @@ def get_utility_path():
             executable = "PassCore.Utilities.exe"
 
         elif machine in ("arm64"):
-            target == "win-arm64"
+            target = "win-arm64"
             executable = "PassCore.Utilities.exe"
 
         else:
@@ -174,6 +174,15 @@ class PassCoreUtility:
 
     def import_pcv(self, path):
         return self._request("vault_import", path=str(path), timeout=120)
+
+    def merge_blob_bin(self, container_directory, output_path):
+        container_directory = (Path(container_directory).expanduser().resolve())
+        output_path = (Path(output_path).expanduser().resolve())
+
+        return self._request("merge_blob_bin",timeout=120,
+            container_directory=str(container_directory),
+            output_path=str(output_path),
+        )
 
     def close(self):
         if self.process.stdin is not None:
