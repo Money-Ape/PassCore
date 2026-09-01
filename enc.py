@@ -1,6 +1,6 @@
+import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes, tempfile
 from gui import PassCoreUI, PasswordDialog, QIcon
 from file import secure_del_tree
-import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes
 from pathlib import Path
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -43,6 +43,17 @@ def get_PassCore_dir():
     
     elif sys == "Windows":
         return Path(os.getenv("APPDATA")) / "PassCore"
+    else:
+        raise RuntimeError(f"Unsupported OS: {sys}")
+
+def get_output_dir():
+    sys = platform.system()
+    if sys == "Linux":
+        return Path("/tmp")
+
+    elif sys == "Windows":
+        return Path(tempfile.gettempdir())
+
     else:
         raise RuntimeError(f"Unsupported OS: {sys}")
         
@@ -108,23 +119,46 @@ def blob_integrity_verify():
             if actual_blobs != vault_meta["blob_count"]:
                 raise ValueError("blob count mismatch.!")
 
-def merge_blob_bin(note_id):
+def merge_blob_bin(window, note_id):
     note_dir = Path(CONTAINER_DIR / note_id)
-    with open(note_dir / "metadata.json", "r") as meta_ctn:
-        meta = json.load(meta_ctn)
-    
-    merge_data = bytearray()
-    for blob_name in sorted(meta["blobs"]):
-        container_id = meta["blobs"][blob_name]["container"]
-        blob_path = note_dir / container_id / blob_name
-        
-        if not blob_path.exists():
-            raise FileNotFoundError(f"Missing blob {blob_name}")
+    if not note_dir.exists():
+        raise FileNotFoundError(f"Note container does not exist: {note_dir}")
 
-        with open(blob_path, "rb") as src_blob: # Merge all the blobs exists in PASSCORE_DIR to generate bin cache for after use in Decryption.!
-            merge_data.extend(src_blob.read())
-    
-    return bytes(merge_data)
+    metadata_path = note_dir / "metadata.json"
+    if not metadata_path.exists():
+        raise FileNotFoundError(f"Note metadata is missing: {metadata_path}")
+
+    # =============================================
+    # Temporary output path genrated by C# handler.
+
+    output_path = (get_output_dir() / f"passcore_merge_{uuid.uuid4().hex}.bin")
+
+    try:
+        print(f"{BLUE}C# MERGE: {RESET}\n{note_id} -> {output_path}")
+        window.utility.merge_blob_bin(note_dir, output_path)
+
+        if not output_path.exists():
+            raise FileNotFoundError(f"C# merger did not create output file:\n{output_path}")
+
+        # Here Python reads the final merged binary produced by C# Handler.
+        with open(output_path, "rb") as merged_f:
+            merged_data = merged_f.read()
+
+        if not merged_data:
+            raise ValueError(f"C# merger produced an empty binary for note: {note_id}")
+
+        print(f"{GREEN}C# MERGE COMPLETE:{RESET}\n{len(merged_data)} bytes")
+
+        return merged_data
+
+    finally:
+        # The merge bin is only the temp decryption input.
+        if output_path.exists():
+            try:
+                output_path.unlink()
+                print(f"{GREEN}MERGE TEMP REMOVED:{RESET}\n{output_path}")
+            except OSError as e:
+                print(f"{YELLOW}WARNING:{RESET}\nUnable to remove merge temp file: {e}")
 
 def split_file_bin(encrypted_data, note_id, title, timestamp, chunk_size=64):
     blob_info = {}
@@ -141,7 +175,7 @@ def split_file_bin(encrypted_data, note_id, title, timestamp, chunk_size=64):
         container_path = note_dir / container_id
         container_path.mkdir(parents=True, exist_ok=True)
         
-        path = (container_path / f"blob_{index:04d}.bin").resolve()
+        path = (container_path / f"{note_id}_{index:04d}.bin").resolve()
         print(f"{path.name} Chunk Size: {len(chunk)} bytes")
         with open(path, "wb") as blob_dst: # write data for splitting bin data to blobs 
             blob_dst.write(chunk)
@@ -165,7 +199,7 @@ def notes_metadata(title, note_id, timestamp, blob_info, encrypted_data):
     for blob_name, info in blob_info.items():
         container_id = info["container"]
         blob_path = note_dir / container_id / blob_name
-        if Path(blob_name).match("blob_*.bin"):
+        if Path(blob_name).match(f"{note_id}_*.bin"):
             size = blob_path.stat().st_size
             blob_data[blob_name] = {
                 "container": container_id,
@@ -522,7 +556,7 @@ def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
             
             for title, note in meta["notes"].items():
                 note_id = next(iter(note))
-                merged = merge_blob_bin(note_id)
+                merged = merge_blob_bin(window, note_id)
                 encrypted_blobs.append(merged)
                 blob_note_ids.append(note_id)
                 blob_titles.append(title)
