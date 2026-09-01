@@ -9,7 +9,7 @@ namespace PassCore.Utilities;
 
 public static class Program{
     private static readonly JsonSerializerOptions JsonOptions = new(){
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
     
     public static int Main(){
@@ -54,6 +54,15 @@ public static class Program{
 
             "vault_export" => VaultFileService.ExportPcv(request.Destination),
             "vault_import" => VaultFileService.ImportPcv(request.Path),
+
+            "merge_blob_bin" => request.ContainerDirectory is not null && request.OutputPath is not null
+                    ? BlobMerger.Merge(request.ContainerDirectory, request.OutputPath) : UtilityResponse.Fail("container_directory and output_path are required."),
+
+            "merge_note_blob" => request.NoteTitle is not null && request.OutputPath is not null
+                    ? BlobMerger.MergeNote(request.NoteTitle, request.OutputPath) : UtilityResponse.Fail("note_title and output_path are required."),
+
+            "merge_image_blob" => request.AlbumName is not null && request.ImageFilename is not null && request.OutputPath is not null
+                    ? BlobMerger.MergeImage(request.AlbumName, request.ImageFilename, request.OutputPath) : UtilityResponse.Fail("album_name, image_filename and output_path are required."),
 
             _ => UtilityResponse.Fail($"Unknown operation: {request.Operation}")
         };
