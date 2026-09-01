@@ -10,7 +10,7 @@ from security.yaml_secure import secure_load, convert_yaml_to_text, VaultValidat
 from pcvmenu.images import IMAGES_META, merge_image_bin, decrypt_image, import_image_bytes
 
 PACKAGE_MAGIC = b"PASSCORE-PCX\x01"
-PACKAGE_VERSION = 1
+PACKAGE_VERSION = 2  # v2 adds an explicit protected-flag byte; v1 (always protected) still reads fine.
 KDF_TIME = 3
 KDF_MEMORY = 65536
 KDF_PARALLELISM = 4
@@ -27,18 +27,22 @@ def _derive_package_key(password: str, salt: bytes) -> bytes:
         type=Type.ID,
     )
 
-def _encrypt_package(payload: bytes, password: str) -> bytes:
+def _encrypt_package(payload: bytes, password: str | None) -> bytes:
+    protected = bool(password)
+    header = (PACKAGE_MAGIC + struct.pack(">B", PACKAGE_VERSION) + struct.pack(">B", 1 if protected else 0))
+
+    if not protected:
+        return header + payload
+
     salt = os.urandom(16)
     nonce = os.urandom(12)
     key = _derive_package_key(password, salt)
     ciphertext = AESGCM(key).encrypt(nonce, payload, PACKAGE_MAGIC)
 
-    header = (PACKAGE_MAGIC + struct.pack(">B", PACKAGE_VERSION) + salt + nonce)
-    return header + ciphertext
+    return header + salt + nonce + ciphertext
 
-def _decrypt_package(package: bytes, password: str) -> bytes:
-    minimum = len(PACKAGE_MAGIC) + 1 + 16 + 12 + 16
-    if len(package) < minimum:
+def _decrypt_package(package: bytes, password: str | None) -> bytes:
+    if len(package) < len(PACKAGE_MAGIC) + 1:
         raise ValueError("Invalid or incomplete PassCore package.")
 
     if not package.startswith(PACKAGE_MAGIC):
@@ -48,8 +52,25 @@ def _decrypt_package(package: bytes, password: str) -> bytes:
     version = package[offset]
     offset += 1
 
-    if version != PACKAGE_VERSION:
+    if version == 1:
+        protected = True  # Legacy packages predate the protected-flag byte and were always encrypted.
+
+    elif version == 2:
+        if len(package) < offset + 1:
+            raise ValueError("Invalid or incomplete PassCore package.")
+
+        protected = bool(package[offset])
+        offset += 1
+
+    else:
         raise ValueError(f"Unsupported PassCore package version: {version}")
+
+    if not protected:
+        return package[offset:]
+
+    minimum_remaining = 16 + 12 + 16  # salt + nonce + AESGCM tag
+    if len(package) < offset + minimum_remaining:
+        raise ValueError("Invalid or incomplete PassCore package.")
 
     salt = package[offset:offset + 16]
     offset += 16
@@ -58,6 +79,10 @@ def _decrypt_package(package: bytes, password: str) -> bytes:
     offset += 12
 
     ciphertext = package[offset:]
+
+    if not password:
+        raise ValueError("This package is password protected.\n\nEnter the package password to import it.")
+
     key = _derive_package_key(password, salt)
 
     try:
@@ -175,9 +200,9 @@ class ImportExportWizard(QDialog):
 
         self.import_password = QLineEdit()
         self.import_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.import_password.setPlaceholderText("Package password")
+        self.import_password.setPlaceholderText("Package password (leave blank if not password protected)")
 
-        self.import_password_label = QLabel("Package Password:")
+        self.import_password_label = QLabel("Package Password (optional):")
         self.import_show_password = QCheckBox("Show Password")
         self.import_show_password.toggled.connect(self._toggle_import_password)
 
@@ -230,12 +255,8 @@ class ImportExportWizard(QDialog):
         self.select_all_btn = QPushButton("Select All")
         self.clear_all_btn = QPushButton("Clear All")
 
-        self.select_all_btn.clicked.connect(
-            lambda: self._set_all_export_items(True)
-        )
-        self.clear_all_btn.clicked.connect(
-            lambda: self._set_all_export_items(False)
-        )
+        self.select_all_btn.clicked.connect(lambda: self._set_all_export_items(True))
+        self.clear_all_btn.clicked.connect(lambda: self._set_all_export_items(False))
 
         selection_buttons = QHBoxLayout()
         selection_buttons.addWidget(self.select_all_btn)
@@ -251,16 +272,30 @@ class ImportExportWizard(QDialog):
         self.export_count = QLabel("0 selected")
         layout.addWidget(self.export_count)
 
+        self.export_protect = QCheckBox("Password protect this export")
+        self.export_protect.setChecked(False)
+        self.export_protect.toggled.connect(self._toggle_export_protect)
+        layout.addWidget(self.export_protect)
+
+        self.export_password_label = QLabel("Package Password:")
         self.export_password = QLineEdit()
         self.export_password.setEchoMode(QLineEdit.EchoMode.Password)
         self.export_password.setPlaceholderText("Choose a package password")
 
-        layout.addWidget(QLabel("Package Password:"))
+        layout.addWidget(self.export_password_label)
         layout.addWidget(self.export_password)
+
+        self._toggle_export_protect(False)  # Start hidden/disabled to match the unchecked default.
 
         self.export_btn = QPushButton("Export Selected")
         self.export_btn.clicked.connect(self._export_selected)
         layout.addWidget(self.export_btn)
+
+    def _toggle_export_protect(self, checked):
+        self.export_password_label.setVisible(checked)
+        self.export_password.setVisible(checked)
+        if not checked:
+            self.export_password.clear()
 
     def _refresh_import_ui(self):
         object_type = self.import_type.currentData()
@@ -430,7 +465,7 @@ class ImportExportWizard(QDialog):
             "title": title,
             "content": imported,
         })
-        self.parent_window.load_notes(self.parent_window.notes)
+        self.parent_window.show_credentials()
 
         if hasattr(self.parent_window, "utility"):
             self.parent_window.utility.mark_vault_changed()
@@ -438,7 +473,6 @@ class ImportExportWizard(QDialog):
         self.parent_window.save_btn.click() # The real save slot is connected by enc.py.
 
         QMessageBox.information(self, "PassCore", f"'{title}' imported successfully.")
-        self.parent_window.save_btn.click()
         self.accept()
 
     def _import_package(self):
@@ -447,14 +481,10 @@ class ImportExportWizard(QDialog):
             return
 
         path = self.import_file.text().strip()
-        password = self.import_password.text()
+        password = self.import_password.text() or None
 
         if not path:
             QMessageBox.information(self, "PassCore", "Select a PassCore package first.")
-            return
-
-        if not password:
-            QMessageBox.warning(self, "PassCore", "Enter the package password.")
             return
 
         try:
@@ -518,7 +548,7 @@ class ImportExportWizard(QDialog):
             )
 
         self.parent_window.notes.extend(imported)
-        self.parent_window.load_notes(self.parent_window.notes)
+        self.parent_window.show_credentials()
 
         if hasattr(self.parent_window, "utility"):
             self.parent_window.utility.mark_vault_changed()
@@ -526,7 +556,6 @@ class ImportExportWizard(QDialog):
         self.parent_window.save_btn.click() # enc.py owns the actual encryption/save pipeline.
 
         QMessageBox.information(self, "PassCore", f"Imported {len(imported)} note(s) successfully.")
-        self.parent_window.save_btn.click()
         self.accept()
 
     def _import_images_package(self, manifest, files):
@@ -539,6 +568,8 @@ class ImportExportWizard(QDialog):
             if not album_name.strip():
                 continue
 
+            album_name = self._unique_album_name(album_name) # Avoid silently merging into an existing album.
+
             imported_albums += 1
             for image in album.get("images", []):
                 filename = _safe_filename(
@@ -550,6 +581,8 @@ class ImportExportWizard(QDialog):
                     raise ValueError(
                         f"Missing image payload: {payload_name}"
                     )
+
+                filename = self._unique_image_filename(album_name, filename) # Defensive: avoid in-package filename collisions too.
 
                 image_bytes = files[payload_name]
                 import_image_bytes(
@@ -605,11 +638,13 @@ class ImportExportWizard(QDialog):
             )
             return
 
-        password = self.export_password.text()
+        password = None
+        if self.export_protect.isChecked():
+            password = self.export_password.text()
 
-        if not password:
-            QMessageBox.warning(self, "PassCore", "Choose a package password.")
-            return
+            if not password:
+                QMessageBox.warning(self, "PassCore", "Choose a package password, or uncheck 'Password protect this export'.")
+                return
 
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -753,6 +788,51 @@ class ImportExportWizard(QDialog):
 
         files["manifest.json"] = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
         return files
+
+    def _unique_album_name(self, album_name): # ========================================================== Helpers
+        """Avoid silently merging an imported album into an existing one
+        with the same name - create a new album (name (1), (2), ...)
+        instead, matching how note titles are de-duplicated on import."""
+        existing = set()
+
+        if IMAGES_META.exists():
+            with open(IMAGES_META, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            existing = set(data.get("albums", {}).keys())
+
+        if album_name not in existing:
+            return album_name
+
+        counter = 1
+        while f"{album_name} ({counter})" in existing:
+            counter += 1
+
+        return f"{album_name} ({counter})"
+
+    def _unique_image_filename(self, album_name, filename): # ========================================================== Helpers
+        existing = set()
+
+        if IMAGES_META.exists():
+            with open(IMAGES_META, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            albums = data.get("albums", {})
+            if album_name in albums and albums[album_name]:
+                album_id = next(iter(albums[album_name]))
+                existing = set(albums[album_name][album_id].keys())
+
+        if filename not in existing:
+            return filename
+
+        stem = Path(filename).stem
+        suffix = Path(filename).suffix
+        counter = 1
+
+        while f"{stem} ({counter}){suffix}" in existing:
+            counter += 1
+
+        return f"{stem} ({counter}){suffix}"
 
     def _unique_note_title(self, title): # ========================================================== Helpers
         existing = {
