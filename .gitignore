@@ -19,6 +19,9 @@ obj/
 # publish/<arch>/executables
 utilities/PassCore.Utilities/publish/
 
+# Desktop entry package
+.directory
+
 packaging/linux/passcore_x86_64/src
 packaging/linux/passcore_x86_64/pkg
 packaging/linux/passcore_x86_64/PassCore
