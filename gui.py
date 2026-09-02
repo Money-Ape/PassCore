@@ -1,4 +1,4 @@
-import sys, os, subprocess, json, ctypes, uuid, platform
+import argparse, sys, os, subprocess, json, ctypes, uuid, platform
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
@@ -14,6 +14,18 @@ from flowlayout import FlowLayout
 from collections import defaultdict
 from passcore_util import PassCoreUtility
 from pcvmenu.import_export import ImportExportWizard
+from version import __version__
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        prog="PassCore",
+        description="Cryptographic Distributed BlobStorage Vault"
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s v{__version__}"
+    )
 
 def resource_path(relative_path):
     try:
@@ -2564,6 +2576,16 @@ class PasswordDialog(QDialog):
         self.unlock_btn = QPushButton("Ok")
         self.cancel_btn = QPushButton("Cancel")
 
+        version_label = QLabel(f"v{__version__}")
+        version_label.setStyleSheet(f"""
+            QLabel {{
+                color: {self.t};
+                background: transparent;
+                border: none;
+                font-size: 9pt;
+            }}
+        """)
+
         self.show_pass.toggled.connect(self.toggle_password)
         self.unlock_btn.clicked.connect(self.validate_passwd)
         self.cancel_btn.clicked.connect(self.close)
@@ -2620,10 +2642,12 @@ class PasswordDialog(QDialog):
         form_layout.addWidget(self.show_pass)
 
         # Buttons
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        btn_layout.addWidget(self.unlock_btn)
-        btn_layout.addWidget(self.cancel_btn)
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addWidget(version_label)
+
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(self.unlock_btn)
+        bottom_layout.addWidget(self.cancel_btn)
 
         # Main layout
         layout = QVBoxLayout()
@@ -2631,7 +2655,7 @@ class PasswordDialog(QDialog):
         layout.setSpacing(5)
         layout.addLayout(form_layout)
         layout.addSpacing(5)
-        layout.addLayout(btn_layout)
+        layout.addLayout(bottom_layout)
         
         self.setLayout(layout)
         self.setFixedSize(500,400)
