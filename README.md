@@ -97,10 +97,12 @@ CS --> UTIL
 UTIL --> FILE["File"]
 UTIL --> HEALTH["Health"]
 UTIL --> BACKUP["Backup"]
+UTIL --> MERGE["Blob Merge"]
 
 FILE --> PCV["PCV Import / Export"]
 HEALTH --> VH["Vault Health"]
 BACKUP --> BR["Create / Restore"]
+MERGE --> RECON["Blob Reconstruction"]
 ```
 
 *Full architecture, storage layout, and integrity workflows: see [ARCHITECTURE.md](ARCHITECTURE.md).*
@@ -136,7 +138,9 @@ Vault data is reconstructed entirely in memory — no temporary vault or image f
 
 ## Utility Bridge (.NET)
 
-Vault health diagnostics, backups, and `.pcv` export/import run in a compiled .NET process that the PySide6 app talks to over a JSON-over-stdio bridge (`passcore_util.py`).
+Vault health diagnostics, backups, `.pcv` export/import, and encrypted blob reconstruction all run in a compiled .NET process that the PySide6 app talks to over a JSON-over-stdio bridge (`passcore_util.py`).
+
+Blob reconstruction (merging a note's or image's split `.bin` chunks back into one encrypted binary before decryption) is handled by `BlobMerger` on the C# side. The bridge currently drives this by container directory (`merge_blob_bin`); `BlobMerger` also supports resolving a note or image straight from `notes_index.json` / `images_index.json` by title or album + filename (`merge_note_blob` / `merge_image_blob`), though the Python side doesn't call those yet. See [ARCHITECTURE.md](ARCHITECTURE.md#blob-merge-operations) for the full breakdown.
 
 The utility isn't committed to the repo and must be built once:
 
