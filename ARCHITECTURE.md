@@ -159,6 +159,7 @@ subgraph CS["PassCore.Utilities — C#"]
     BACKUP["BackupService"]
     PCV["VaultFileService"]
     HEALTH["HealthService"]
+    MERGE["BlobMerger"]
 
     DEL["DeleteDirectoryContents"]
     FILEUTIL["File Utilities"]
@@ -166,9 +167,18 @@ subgraph CS["PassCore.Utilities — C#"]
     DISPATCH --> BACKUP
     DISPATCH --> PCV
     DISPATCH --> HEALTH
+    DISPATCH --> MERGE
 
     PCV --> DEL
     PCV --> FILEUTIL
+
+    MERGERAW["Merge()\nExplicit container_directory"]
+    MERGENOTE["MergeNote()\nResolves via notes_index.json"]
+    MERGEIMG["MergeImage()\nResolves via images_index.json"]
+
+    MERGE --> MERGERAW
+    MERGE --> MERGENOTE
+    MERGE --> MERGEIMG
 
 end
 
@@ -186,6 +196,13 @@ ZIP --> RETENTION["Retention Policy\nMax 10 Backups"]
 PCV --> PCVFILE[".pcv Archive"]
 
 HEALTH --> VERIFY["Integrity Verification"]
+
+MERGERAW --> MERGEDBIN["Merged .bin (temp)"]
+MERGENOTE --> MERGEDBIN
+MERGEIMG --> MERGEDBIN
+
+INDEX --> MERGENOTE
+IMGINDEX --> MERGEIMG
 
 
 %% ==========================================================
@@ -253,6 +270,8 @@ PYUTIL -->|"backup_restore"| BACKUP
 
 PYUTIL -->|"vault_export"| PCV
 PYUTIL -->|"vault_import"| PCV
+
+PYUTIL -->|"merge_blob_bin"| MERGERAW
 ```
 
 ---
@@ -304,11 +323,95 @@ Each blob receives:
 * File Size
 * SHA256 Hash
 
-Metadata is recorded inside:
+Metadata is recorded in two layers: a global index (`notes_index.json`) that maps note titles to note UUIDs, and a per-note `metadata.json` inside that note's own container directory, which lists every blob belonging to it.
 
-```text
-notes_index.json
+---
+
+# Metadata Storage Structure
+
+PassCore separates "which note is this" from "which blobs make up this note." The global index answers the first question; the per-note `metadata.json` answers the second.
+
+## Global Note Index — `notes_index.json`
+
+Located at `PASSCORE_DIR/notes_index.json` (see [Storage Layout](#storage-layout)). One file for the whole vault.
+
+```json
+{
+    "storage_path": "/home/user/.local/share/.passcore_db/notes",
+    "notes": {
+        "My Bank Login": {
+            "4158797a8f3b4cef80d88e7f75325c52": {
+                "created": "20-07-2026 03:05:32 PM",
+                "modified": "01-09-2026 05:05:17 PM"
+            }
+        }
+    }
+}
 ```
+
+* `storage_path` — absolute path to the notes container root (`CONTAINER_DIR`). `BlobMerger.MergeNote()` (C#) falls back to the OS-default `PassCorePaths.NotesContainerDirectory` if this key is absent.
+* `notes` — keyed by note **title**. Each title maps to a single-entry object keyed by the note's **UUID**, holding `created` / `modified` timestamps. The UUID is also the name of the note's container directory under `storage_path`.
+* Renaming a note keeps its UUID and simply moves the entry to the new title key; the UUID (and therefore its blob container) never changes.
+
+## Per-Note Blob Metadata — `metadata.json`
+
+Located at `<storage_path>/<note_uuid>/metadata.json`. One file per note, describing only that note's blobs.
+
+```json
+{
+    "title": "My Bank Login",
+    "uuid": "4158797a8f3b4cef80d88e7f75325c52",
+    "created": "20-07-2026 03:05:32 PM",
+    "modified": "01-09-2026 05:05:17 PM",
+    "encrypted_size": 609,
+    "blob_count": 10,
+    "blobs": {
+        "4158797a8f3b4cef80d88e7f75325c52_0000.bin": {
+            "container": "667734b06edf47d2",
+            "size": 64,
+            "sha256": "2a70f1285e179618d3645537169bc8a473cc752a7eb58bf046a23b5ba6cc5e2"
+        }
+    }
+}
+```
+
+* `encrypted_size` — total byte length of the encrypted note before splitting; used as a cross-check after reconstruction.
+* `blob_count` — number of blob files; must equal `len(blobs)`, verified during integrity checks.
+* `blobs` — keyed by **blob filename** (`<note_uuid>_NNNN.bin`, zero-padded, defining merge order). Each entry records:
+  * `container` — the random per-blob container UUID the file physically lives under (`<note_uuid>/<container>/<blob_filename>`). Every blob gets its own container directory, so container IDs are not shared or sequential.
+  * `size` — expected file size in bytes, checked against the file on disk.
+  * `sha256` — expected hash of the blob contents, checked against the file on disk.
+
+Reconstruction order is derived from the numeric suffix in the blob filename, not from dictionary order — both the Python `blob_integrity_verify()` path and the C# `BlobMerger` sort blobs by that suffix before concatenating them.
+
+## Image Index — `images_index.json`
+
+Located at `PASSCORE_DIR/images_index.json`. Mirrors the note index but nests one level deeper for albums, and stores per-image details inline (no separate per-image `metadata.json`).
+
+```json
+{
+    "albums": {
+        "Vacation": {
+            "9f2c1a7b4e6d4a3c8b1f0d5e6a7b8c9d": {
+                "beach.jpg": {
+                    "uuid": "0a1b2c3d4e5f6789abcdef0123456789",
+                    "mime": "image/jpeg",
+                    "extension": ".jpg",
+                    "width": 1920,
+                    "height": 1080,
+                    "size": 482301,
+                    "sha256": "b1946ac92492d2347c6235b4d2611184...",
+                    "created_at": "20-07-2026 03:05:32 PM"
+                }
+            }
+        }
+    }
+}
+```
+
+* `albums` — keyed by **album name**, each mapping to a single-entry object keyed by an **album UUID**.
+* Within an album, entries are keyed by **image filename**, each carrying its own `uuid` (used as the image's blob-container folder name), image dimensions/MIME, and an `sha256` of the *encrypted* payload (used for duplicate-import detection, not blob integrity — blob-level integrity for images uses the same container/size/sha256 pattern as notes, stored per-blob under the image's container).
+* Image blobs live at `ImageContainerDirectory/<album_uuid>/<image_uuid>/...`, resolved by `BlobMerger.MergeImage(albumName, filename, outputPath)`.
 
 ---
 
@@ -467,6 +570,22 @@ This is distinct from the **`.pcx` PassCore Package** format used by the File �
 
 ---
 
+# Blob Merge Operations
+
+Blob reconstruction (concatenating a note's or image's `_NNNN.bin` chunks back into one encrypted binary) is performed by `BlobMerger` in the C# utility, not in Python. It is reached over the same JSON-over-stdio bridge as backups and PCV, via three dispatcher operations:
+
+| Operation | C# entry point | Resolution | Python wrapper |
+|---|---|---|---|
+| `merge_blob_bin` | `BlobMerger.Merge(containerDirectory, outputPath)` | Caller supplies the note/image container directory directly | `PassCoreUtility.merge_blob_bin()` — used today by `enc.py`'s `merge_blob_bin()` |
+| `merge_note_blob` | `BlobMerger.MergeNote(title, outputPath)` | C# looks up the title in `notes_index.json` to find the note UUID, then merges `<storage_path>/<uuid>` | not yet exposed in `passcore_util.py` |
+| `merge_image_blob` | `BlobMerger.MergeImage(albumName, filename, outputPath)` | C# looks up the album and filename in `images_index.json` to find the image UUID, then merges `ImageContainerDirectory/<album_uuid>/<image_uuid>` | not yet exposed in `passcore_util.py` |
+
+All three converge on the same `MergeCore()` routine: it reads that container's `metadata.json`, orders blobs by the numeric suffix in their filename, streams each blob from `<container>/<blob_container_id>/<blob_filename>` into the output file, and verifies the merged result's size against both the sum of blobs written and the `encrypted_size` recorded in `metadata.json`.
+
+`merge_note_blob` and `merge_image_blob` let the C# side resolve a note or image straight from title/filename without Python first walking `notes_index.json` / `images_index.json` itself — today only `merge_blob_bin` is wired up on the Python side, with `enc.py` and `images.py` doing that index lookup themselves before calling it.
+
+---
+
 # Backup Architecture
 
 Backups contain:
@@ -540,11 +659,21 @@ Theme changes are applied immediately without restarting the application.
 ```text
 ~/.local/share/passcore/
 ├── vault.salt
-└── notes_index.json
+├── notes_index.json
+└── images_index.json
 
-~/.local/share/.passcore_db/
-├── container_id/
-│   └── blob_*.bin
+~/.local/share/.passcore_db/notes/
+├── <note_uuid>/
+│   ├── metadata.json
+│   └── <blob_container_id>/
+│       └── <note_uuid>_NNNN.bin
+
+~/.local/share/.passcore_db/images/     (ImageContainerDirectory)
+├── <album_uuid>/
+│   └── <image_uuid>/
+│       ├── metadata.json
+│       └── <blob_container_id>/
+│           └── <image_uuid>_NNNN.bin
 ```
 
 ## Windows
@@ -552,12 +681,24 @@ Theme changes are applied immediately without restarting the application.
 ```text
 %APPDATA%\PassCore\
 ├── vault.salt
-└── notes_index.json
+├── notes_index.json
+└── images_index.json
 
-%LOCALAPPDATA%\PassCoreData\
-├── container_id\
-│   └── blob_*.bin
+%LOCALAPPDATA%\PassCoreData\notes\
+├── <note_uuid>\
+│   ├── metadata.json
+│   └── <blob_container_id>\
+│       └── <note_uuid>_NNNN.bin
+
+%LOCALAPPDATA%\PassCoreData\images\     (ImageContainerDirectory)
+├── <album_uuid>\
+│   └── <image_uuid>\
+│       ├── metadata.json
+│       └── <blob_container_id>\
+│           └── <image_uuid>_NNNN.bin
 ```
+
+Each note or image gets its own `metadata.json` inside its UUID-named directory (see [Metadata Storage Structure](#metadata-storage-structure)); `notes_index.json` and `images_index.json` are the only global indexes, and neither embeds blob-level detail — that stays local to each container.
 
 ---
 
