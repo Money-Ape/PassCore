@@ -1,4 +1,4 @@
-import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes, tempfile
+import os, struct, json, platform, hashlib, uuid, base64, sys, ctypes, tempfile, time, functools, contextlib
 from gui import PassCoreUI, PasswordDialog, QIcon
 from file import secure_del_tree
 from pathlib import Path
@@ -25,6 +25,32 @@ GREEN = "\033[32m" # SUCCESS & NEW RECORDS
 YELLOW = "\033[33m" # FRESH Keys, INTEGERS & OLD RECORDS 
 BLUE = "\033[34m" # EXISTING Keys
 RESET = "\033[0m"
+
+def timed(label=None):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            name = label or func.__name__
+            start = time.perf_counter()
+            try:
+                return func(*args, **kwargs)
+
+            finally:
+                elapsed = time.perf_counter() - start
+                print(f"{BLUE}[{name}]{RESET} took {YELLOW}{elapsed:.3f}s{RESET}")
+
+        return wrapper
+    return decorator
+
+@contextlib.contextmanager
+def timed_block(label):
+    start = time.perf_counter()
+    try:
+        yield
+
+    finally:
+        elapsed = time.perf_counter() - start
+        print(f"{BLUE}[{label}]{RESET} took {YELLOW}{elapsed:.3f}s{RESET}")
 
 def get_container_dir():
     sys = platform.system()
@@ -83,6 +109,7 @@ def sha256_blob(shafile_path):
 
     return hh.hexdigest() # return hexadecimal hash string.!
 
+@timed()
 def blob_integrity_verify():
     if not META_FILE.exists():
         raise FileNotFoundError("Metadata file is missing")
@@ -119,6 +146,7 @@ def blob_integrity_verify():
             if actual_blobs != vault_meta["blob_count"]:
                 raise ValueError("blob count mismatch.!")
 
+@timed()
 def merge_blob_bin(window, note_id):
     note_dir = Path(CONTAINER_DIR / note_id)
     if not note_dir.exists():
@@ -227,6 +255,7 @@ def notes_metadata(title, note_id, timestamp, blob_info, encrypted_data):
     print("================================================")
     print(f"Saved.! {YELLOW}{note_id}{RESET}\n")
 
+@timed()
 def encrypt_vault(notes, key): # Encrypt raw bytes
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
 
@@ -312,6 +341,7 @@ def encrypt_vault(notes, key): # Encrypt raw bytes
                 secure_del_tree(path)
                 print(f"{GREEN}REMOVED_EXISTING - {container}{RESET}")
 
+@timed()
 def decrypt_vault(key, encrypted_blobs):
     enc_cipher = AESGCM(key) # outputs masterkey for encryption/decryption
     notes = []
@@ -398,6 +428,7 @@ def vault_exists():
     
     return True
 
+@timed()
 def unlock_vault(window, editor, save_btn, close_btn, unlock_btn, lock_btn):
     while True:
         if is_first_run():            
@@ -676,6 +707,7 @@ def autolock_vault(window, editor, save_btn, unlock_btn, lock_btn, close_btn):
     window.key = None
     window.autolock_timer.stop()
 
+@timed()
 def save_vault(window, editor, key):
     window.save_current_note()
     current_note = window.notes[window.current_note]
@@ -695,6 +727,7 @@ def save_vault(window, editor, key):
         f"Last Save\n{timestamp}"
     )
 
+@timed()
 def vault_close(window, key):
     reply = QMessageBox.question(
         window, "PassCore", "Save changes before closing the Vault.?", QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
