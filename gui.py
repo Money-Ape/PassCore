@@ -1,4 +1,4 @@
-import argparse, sys, os, subprocess, json, ctypes, uuid, platform
+import argparse, sys, os, subprocess, json, ctypes, uuid, platform, time
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import(QApplication, QMainWindow, QMenu, QWidget, QTextEdit, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QFrame, QDialog, QFileDialog, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSpinBox, QInputDialog, QListWidget, QListWidgetItem, QToolButton, QProgressDialog, QProgressBar, QScrollArea)
@@ -15,6 +15,14 @@ from collections import defaultdict
 from passcore_util import PassCoreUtility
 from pcvmenu.import_export import ImportExportWizard
 from version import __version__
+
+BLUE = "\033[34m"
+YELLOW = "\033[33m"
+RESET = "\033[0m"
+
+def print_elapsed(label, start_time):
+    elapsed = time.perf_counter() - start_time
+    print(f"{BLUE}[{label}]{RESET} took {YELLOW}{elapsed:.3f}s{RESET}")
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -1829,6 +1837,7 @@ class PassCoreUI(QMainWindow):
             return
 
         self._backup_running = True
+        self._backup_t0 = time.perf_counter()
 
         self.backup_started()
 
@@ -1854,6 +1863,7 @@ class PassCoreUI(QMainWindow):
             return
 
         self._restore_running = True
+        self._restore_t0 = time.perf_counter()
 
         self.backup_started()
 
@@ -1878,6 +1888,7 @@ class PassCoreUI(QMainWindow):
         if getattr(self, "_import_running", False):
             return
         self._import_running = True
+        self._import_t0 = time.perf_counter()
 
         self.import_started()
 
@@ -1902,6 +1913,7 @@ class PassCoreUI(QMainWindow):
         if getattr(self, "_export_running", False):
             return
         self._export_running = True
+        self._export_t0 = time.perf_counter()
 
         self.export_started()
 
@@ -1928,6 +1940,7 @@ class PassCoreUI(QMainWindow):
 
     def on_backup_finished(self, success):
         self._backup_running = False
+        print_elapsed("backup", self._backup_t0)
         self.backup_progress.hide()
         if success:
             self.backup_finished()
@@ -1940,11 +1953,13 @@ class PassCoreUI(QMainWindow):
 
     def on_backup_error(self, error):
         self._backup_running = False
+        print_elapsed("backup (failed)", self._backup_t0)
         self.backup_failed()
         QMessageBox.warning(self, "PassCore", f"Backup Failed\n\n{error}")
 
     def on_restore_finished(self, success):
         self._restore_running = False
+        print_elapsed("restore", self._restore_t0)
         if success:
             self.key = None
             self.editor.setPlainText(self.lock_screen)
@@ -1965,6 +1980,7 @@ class PassCoreUI(QMainWindow):
 
     def on_restore_error(self, error):
         self._restore_running = False
+        print_elapsed("restore (failed)", self._restore_t0)
         self.backup_failed()
         QMessageBox.critical(self, "PassCore Restore", f"Restore Failed\n\n{error}")
         self.update_vault_size()
@@ -2236,10 +2252,12 @@ class PassCoreUI(QMainWindow):
     def on_import_finished(self, success):
         self._import_running = False
         if not success:
+            print_elapsed("import (failed)", self._import_t0)
             self.import_failed_label()
             QMessageBox.warning(self, "Import Failed", "Import failed.")
             return
 
+        print_elapsed("import", self._import_t0)
         self.import_finished_label()
 
         self.editor.setPlainText(self.lock_screen)
@@ -2262,6 +2280,7 @@ class PassCoreUI(QMainWindow):
 
     def on_import_error(self, error):
         self._import_running = False
+        print_elapsed("import (error)", self._import_t0)
         self.import_failed_label()
         QMessageBox.warning(self, "Import Failed", error)
 
@@ -2283,6 +2302,7 @@ class PassCoreUI(QMainWindow):
 
     def on_export_finished(self, result):
         self._export_running = False
+        print_elapsed("export", self._export_t0)
         self.export_finished_label()
         QMessageBox.information(self, "PassCore",
             f"Vault exported successfully.\n\n"
@@ -2291,6 +2311,7 @@ class PassCoreUI(QMainWindow):
 
     def on_export_error(self, error):
         self._export_running = False
+        print_elapsed("export (failed)", self._export_t0)
         self.export_failed_label()
         QMessageBox.critical(self, "Export Failed", error)
 
