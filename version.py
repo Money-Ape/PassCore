@@ -1,6 +1,6 @@
 __majorversion__ = 0
-__minorversion__ = 7
-__patch_release__ = 0
+__minorversion__ = 6
+__patch_release__ = 1
 
 __release_identifier__ = "beta"
 
